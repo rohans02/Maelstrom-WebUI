@@ -6,35 +6,65 @@ import { SwapPreviewModal } from "@/components/swap/swap-preview-modal";
 import { useTrade } from "@/hooks/use-mock-api";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowDownUp } from "lucide-react";
-import { ExchangeRates, TokenSelector } from "./token-selector";
-import { BuyRequest, BuyResult, DAI_MOCK, ETH_MOCK, Token } from "@/lib/mock-api";
-
+import { TokenSelector } from "./token-selector";
+import { Token } from "@/types/token";
+import { BuyRequest, BuyResult } from "@/types/trades";
+import { usePublicClient, useWriteContract } from "wagmi";
+import { ContractClient } from "@/lib/contract-client";
+import { CONTRACT_ADDRESS } from "@/types/contract";
+import { ETH } from "@/types/token";
 
 export function BuyForm() {
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const contractClient = new ContractClient(
+    CONTRACT_ADDRESS,
+    writeContractAsync,
+    publicClient
+  );
   const [ethAmount, setEthAmount] = useState("");
   const [tokenAmount, setTokenAmount] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [isEthInput, setIsEthInput] = useState(true);
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [isFetchingRates, setIsFetchingRates] = useState(false);
+  const [buyPrice, setBuyPrice] = useState<bigint>(BigInt(0));
   const { executeBuy, loading } = useTrade();
   const { toast } = useToast();
-  const [token, setToken] = useState<Token>(DAI_MOCK);
+  const [token, setToken] = useState<Token | undefined>(undefined);
 
-  const exchangeRates = {
-    dai: 0.0003125, 
-    usdc: 0.0003125, 
-    wbtc: 21.09375,
-  };
+  const handleTokenChange = async (selctedToken: Token) => {
+    setToken(selctedToken);
+    if (!selctedToken) return;
+    setIsFetchingRates(true);
+    try {
+      const price = await contractClient.getBuyPrice(selctedToken);
+      setBuyPrice(BigInt(price));
+    } catch (error) {
+      console.error("Error fetching price:", error);
+      toast({
+        title: "Error fetching price",
+        description: (error as Error).message,
+      });
+    } finally {
+      setIsFetchingRates(false);
+    }
+  }
 
-  const handleInputChange = (value: string) => {
-    if(!token) return;
+  const handleInputChange = async (value: string) => {
+    if (!token) return;
     if (!isEthInput) {
       setTokenAmount(value);
-      const ethValue = Number(value) * exchangeRates[token.symbol.toLowerCase() as keyof ExchangeRates];
+      const ethValue = Number(BigInt(value) * BigInt(buyPrice));
       setEthAmount(ethValue.toFixed(6));
     } else {
       setEthAmount(value);
-      const tokenValue = Number(value) / exchangeRates[token.symbol.toLowerCase() as keyof ExchangeRates];
-      setTokenAmount(tokenValue.toFixed(token.symbol.toLowerCase() === "wbtc" ? 6 : 2));
+      if(buyPrice === BigInt(0)) {
+        await handleTokenChange(token);
+      }
+      console.log(buyPrice);
+      const tokenValue = Number(BigInt(value) / BigInt(buyPrice));
+      setTokenAmount(tokenValue.toFixed(6));
     }
   };
 
@@ -43,7 +73,7 @@ export function BuyForm() {
   };
 
   const handlePreview = () => {
-    if (!ethAmount || !tokenAmount) {
+    if (!ethAmount || !tokenAmount || !token) {
       toast({
         title: "Invalid Amount",
         description: "Please enter an amount to swap",
@@ -54,23 +84,26 @@ export function BuyForm() {
   };
 
   const handleConfirmBuy = async () => {
-    if(!token) return;
+    if (!token) return;
+    setIsSwapping(true);
     const request: BuyRequest = {
       token,
       amountIn: ethAmount,
     };
-    const result: BuyResult = await executeBuy(request);
-    if(result.success){
+    const result: BuyResult = await contractClient.buy(request);
+    if (result.success) {
       toast({
         title: "Buy Successful!",
         description: `Tx Hash: ${result.txHash}`,
       });
-    }else{
+    } else {
       toast({
         title: "Buy Failed",
-        description: result.error || "An error occurred during the buy process.",
-      })
+        description:
+          result.error || "An error occurred during the buy process.",
+      });
     }
+    setIsSwapping(false);
     if (result) {
       setEthAmount("");
       setTokenAmount("");
@@ -105,7 +138,10 @@ export function BuyForm() {
           />
           {!isEthInput && (
             <div className="ml-2">
-              <TokenSelector selectedToken={token? token : DAI_MOCK} onTokenChange={setToken} />
+              <TokenSelector
+                selectedToken={token}
+                onTokenChange={handleTokenChange}
+              />
             </div>
           )}
           {isEthInput && (
@@ -131,19 +167,22 @@ export function BuyForm() {
           </span>
         </div>
         <div className="relative flex items-center bg-black/10 group-hover:bg-black/20 rounded-xl p-4 transition-all duration-300">
-              <input
-              type="text"
-              inputMode="decimal"
-              placeholder="0"
-              value={isEthInput ? tokenAmount : ethAmount}
-              readOnly
-              className="w-full bg-transparent text-4xl font-medium outline-none placeholder:text-white/20 
+          <input
+            type="text"
+            inputMode="decimal"
+            placeholder="0"
+            value={isEthInput ? tokenAmount : ethAmount}
+            readOnly
+            className="w-full bg-transparent text-4xl font-medium outline-none placeholder:text-white/20 
                 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
                 font-plus-jakarta text-white/90 transition-all duration-300"
-              />
+          />
           {isEthInput && (
             <div className="ml-2">
-              <TokenSelector selectedToken={token ? token : DAI_MOCK} onTokenChange={setToken} />
+              <TokenSelector
+                selectedToken={token}
+                onTokenChange={handleTokenChange}
+              />
             </div>
           )}
           {!isEthInput && (
@@ -181,8 +220,8 @@ export function BuyForm() {
         isOpen={showPreview}
         onClose={() => setShowPreview(false)}
         onConfirm={handleConfirmBuy}
-        tokenIn={ETH_MOCK}
-        tokenOut={token? token : DAI_MOCK}
+        tokenIn={ETH}
+        tokenOut={token}
         amountIn={ethAmount}
         amountOut={tokenAmount}
         loading={loading}

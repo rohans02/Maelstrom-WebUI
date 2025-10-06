@@ -12,8 +12,9 @@ export interface LiquidityPoolToken extends Token{
   balance: string
 }
 
-export interface ETH{
-  priceUSD: string
-  lastUpdated: number
-  symbol: string
+export const ETH: Token = {
+  address: "0x0000000000000000000000000000000000000000",
+  symbol: "ETH",
+  name: "Ether",
+  decimals: 18,
 }

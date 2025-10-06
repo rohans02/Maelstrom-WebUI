@@ -44,13 +44,6 @@ export function SwapInterface() {
   const [fetchingRates, setFetchingRates] = useState(false);
   const { toast } = useToast();
 
-  const exchangeRates: Record<string, Record<string, number>> = {
-    eth: { dai: 3200, usdc: 3200, wbtc: 0.017 },
-    dai: { eth: 0.0003125, usdc: 1, wbtc: 0.0000053 },
-    usdc: { eth: 0.0003125, dai: 1, wbtc: 0.0000053 },
-    wbtc: { eth: 58.8, dai: 188160, usdc: 188160 },
-  };
-
   const calculateOutput = (amount: string, isInput: boolean) => {
     if (!amount) return "";
     if (isInput) {
