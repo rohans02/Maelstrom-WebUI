@@ -145,7 +145,7 @@ export default function DashboardPage() {
       }
     };
     fetchData();
-  });
+  },[]);
 
   return (
     <div className="min-h-screen relative bg-gradient-pattern overflow-hidden">
