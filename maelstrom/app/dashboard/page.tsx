@@ -37,20 +37,22 @@ export default function DashboardPage() {
     try {
       const count = await contractClient.getUserPoolCount(address!);
       setTotalPools(count);
+      return count;
     } catch (error) {
       console.error("Error fetching pool count:", error);
       toast.error("Failed to fetch pool count.");
     }
   };
 
-  const fetchUserPools = async () => {
+  const fetchUserPools = async (poolCount: number) => {
     if (!address) return;
+    if(poolCount == pools.length) return;
     try {
-      for (let i = 0; i < Math.ceil(totalPools / POOL_FETCH_LIMIT); i++) {
+      for (let i = 0; i < Math.ceil(poolCount / POOL_FETCH_LIMIT); i++) {
         const userPools = await contractClient.getUserPools(
           address,
           i * POOL_FETCH_LIMIT,
-          POOL_FETCH_LIMIT
+          Math.min(POOL_FETCH_LIMIT,poolCount - 1)
         );
         setPools((prevPools) => [...prevPools, ...userPools]);
       }
@@ -100,7 +102,7 @@ export default function DashboardPage() {
     if (!address) return;
     try {
       const liquidity = await contractClient.getUserLiquidity(address);
-      setTotalLiquidity(liquidity);
+      setTotalLiquidity(formatEther(BigInt(liquidity)));
     } catch (error) {
       console.error("Error fetching user liquidity:", error);
       toast.error("Failed to fetch user liquidity.");
@@ -108,13 +110,14 @@ export default function DashboardPage() {
   };
 
   const calculatePortfolioValue = () => {
-    let total = BigInt(0);
+    let total = 0;
     for (const pool of pools) {
       const proportion =
         BigInt(pool.lpToken!.balance) / BigInt(pool.lpToken!.totalSupply);
-      total += proportion * BigInt(pool.totalLiquidity);
+      total += Number(proportion) * Number(pool.totalLiquidity);
     }
-    setPortfolioValue(Number(formatEther(total)).toFixed(4));
+    console.log(pools)
+    setPortfolioValue((formatEther(BigInt(total))));
   };
 
   const calculateProfit = () => {
@@ -129,14 +132,13 @@ export default function DashboardPage() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        await fetchPoolCount();
-        await fetchUserPools();
+        const count = await fetchPoolCount();
+        if(count == undefined) throw new Error("Pool count is undefined");
+        await fetchUserPools(count);
         await fetchUserLiquidity();
         await fetchRecentDeposits();
         await fetchRecentWithdrawals();
-        calculatePortfolioValue();
-        calculateProfit();
-        setIsLoading(false);
+        
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
         toast.error("Failed to fetch dashboard data.");
@@ -144,8 +146,14 @@ export default function DashboardPage() {
         setIsLoading(false);
       }
     };
+    const calculateValues = () => {
+      calculatePortfolioValue();
+      calculateProfit();
+      setIsLoading(false);
+    }
     fetchData();
-  },[]);
+    calculateValues();
+  },[pools]);
 
   return (
     <div className="min-h-screen relative bg-gradient-pattern overflow-hidden">

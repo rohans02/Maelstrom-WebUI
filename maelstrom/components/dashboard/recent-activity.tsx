@@ -3,6 +3,7 @@
 import { formatRelativeTime } from "@/types/pool";
 import { Deposit, Withdraw } from "@/types/trades";
 import { useEffect, useState } from "react";
+import { formatEther } from "viem";
 
 interface RecentActivityProps {
   events: (Deposit | Withdraw)[];
@@ -25,14 +26,14 @@ export function RecentActivity({ events }: RecentActivityProps) {
         return {
           type: "Deposit",
           token: event.token.symbol,
-          amount: `${event.ethAmount} ETH + ${event.tokenAmount} ${event.token.symbol}`,
+          amount: `${formatEther(BigInt(event.ethAmount))} ETH + ${formatEther(BigInt(event.tokenAmount))} ${event.token.symbol}`,
           timestamp: event.timestamp,
         };
       } else {
         return {
           type: "Withdraw",
           token: event.token.symbol,
-          amount: `${event.ethAmount} ETH + ${event.tokenAmount} ${event.token.symbol}`,
+          amount: `${formatEther(BigInt(event.ethAmount))} ETH + ${formatEther(BigInt(event.tokenAmount))} ${event.token.symbol}`,
           timestamp: event.timestamp,
         };
       }
@@ -63,9 +64,9 @@ export function RecentActivity({ events }: RecentActivityProps) {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm text-muted-foreground/70">
+                    <span className="text-sm text-muted-foreground/70 bg-muted-foreground/10 px-2 py-1 rounded-full">
                     {activity.token}
-                  </span>
+                    </span>
                   <span className="text-sm font-medium">{activity.amount}</span>
                 </div>
               </div>

@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TokenSelector } from "./token-selector";
 import { SwapPreviewModal } from "@/components/swap/swap-preview-modal";
-import { useTrade } from "@/hooks/use-mock-api";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowDownUp } from "lucide-react";
 import { usePublicClient, useWriteContract } from "wagmi";
@@ -13,7 +12,7 @@ import { CONTRACT_ADDRESS } from "@/types/contract";
 import { ETH, Token } from "@/types/token";
 import { SellRequest, SellResult } from "@/types/trades";
 import { RowPool } from "@/types/pool";
-import { formatEther } from "viem";
+import { formatEther, parseEther } from "viem";
 
 interface SellFormProps {
   tokens: RowPool[];
@@ -40,7 +39,6 @@ export function SellForm({
   const [tokenAmount, setTokenAmount] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [isEthInput, setIsEthInput] = useState(false);
-  const { executeSell, loading } = useTrade();
   const { toast } = useToast();
   const [isSwapping, setIsSwapping] = useState(false);
 
@@ -81,7 +79,7 @@ export function SellForm({
     if (!token) return;
     const sellRequest: SellRequest = {
       token: token,
-      amountIn: tokenAmount,
+      amountIn: parseEther(tokenAmount).toString(),
     };
 
     const result: SellResult = await contractClient.sell(sellRequest);
@@ -223,13 +221,13 @@ export function SellForm({
 
       <Button
         onClick={handlePreview}
-        disabled={!ethAmount || !tokenAmount || loading}
+        disabled={!ethAmount || !tokenAmount || isSwapping}
         className="w-full h-14 mt-6 bg-gradient-to-r from-accent-cyan to-primary-500 hover:from-accent-cyan/90 hover:to-primary-500/90 
           text-white font-semibold rounded-xl shadow-lg hover:shadow-accent-cyan/25 transition-all duration-300 
           disabled:from-gray-600/50 disabled:to-gray-700/50 disabled:cursor-not-allowed disabled:text-white/50
           border border-white/[0.05] backdrop-blur-sm font-plus-jakarta text-base"
       >
-        {loading ? (
+        {isSwapping ? (
           <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/20 border-t-white" />
         ) : (
           `Preview Sell`
@@ -244,7 +242,7 @@ export function SellForm({
         tokenOut={ETH}
         amountIn={tokenAmount}
         amountOut={ethAmount}
-        loading={loading}
+        loading={isSwapping}
       />
     </div>
   );

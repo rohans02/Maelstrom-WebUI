@@ -13,7 +13,7 @@ import { ContractClient } from "@/lib/contract-client";
 import { CONTRACT_ADDRESS } from "@/types/contract";
 import { ETH } from "@/types/token";
 import { RowPool } from "@/types/pool";
-import { formatEther } from "viem";
+import { formatEther, parseEther } from "viem";
 
 interface BuyFormProps {
   tokens: RowPool[];
@@ -86,7 +86,7 @@ export function BuyForm({
     setIsSwapping(true);
     const request: BuyRequest = {
       token,
-      amountIn: ethAmount,
+      amountIn: parseEther(ethAmount).toString(),
     };
     const result: BuyResult = await contractClient.buy(request);
     if (result.success) {

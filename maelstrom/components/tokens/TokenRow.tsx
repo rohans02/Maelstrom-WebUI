@@ -66,7 +66,7 @@ export function TokenRow({ poolToken }: TokenRowProps) {
           <div className="hidden lg:flex flex-col items-end min-w-[120px]">
             <div className="text-xs text-muted-foreground/60 mb-1">Total Liquidity</div>
             <div className="text-sm font-medium text-white/90">
-              {totalLiquidity} ETH
+              {formatEther(BigInt(totalLiquidity))} ETH
             </div>
           </div>
 

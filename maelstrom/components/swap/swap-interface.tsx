@@ -216,8 +216,8 @@ export function SwapInterface() {
     const swapRequest: SwapRequest = {
       tokenIn: swapState.tokenIn,
       tokenOut: swapState.tokenOut,
-      amountIn: swapState.amountIn,
-      minimumTokenOut: swapState.amountOut,
+      amountIn: parseEther(swapState.amountIn).toString(),
+      minimumTokenOut: parseEther(swapState.amountOut).toString(),
     };
     const result = await contractClient.swap(swapRequest);
     if (result.success) {

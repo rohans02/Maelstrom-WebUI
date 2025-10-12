@@ -17,7 +17,7 @@ export function TokenPairStats({ poolData }: TokenPairStatsProps) {
     },
     {
       label: "Total Liquidity",
-      value: `${poolData.totalLiquidty} ETH`,
+      value: `${formatEther(BigInt(poolData.totalLiquidty))} ETH`,
     },
     {
       label: "Buy Price",

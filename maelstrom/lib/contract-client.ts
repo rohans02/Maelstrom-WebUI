@@ -2,7 +2,7 @@ import { ABI, IContractClient } from "@/types/contract";
 import { InitPool, InitPoolResult, Pool, Reserve, RowPool } from "@/types/pool";
 import { LiquidityPoolToken, Token } from "@/types/token";
 import { BuyRequest, BuyResult, BuyTrade, Deposit, DepositRequest, DepositResult, SellRequest, SellResult, SellTrade, SwapRequest, SwapResult, SwapTrade, Withdraw, WithdrawRequest, WithdrawResult } from "@/types/trades";
-import { Address, erc20Abi, formatEther, parseAbiItem } from "viem";
+import { Address, erc20Abi, formatEther, parseAbiItem, parseEther } from "viem";
 import { Config, UsePublicClientReturnType } from "wagmi";
 import { WriteContractMutateAsync } from "wagmi/query";
 
@@ -323,7 +323,7 @@ export class ContractClient implements IContractClient {
     private getTotalLiquidity(avgPrice: string, reserve: Reserve): string {
         const tokenInEth = formatEther(BigInt(reserve.tokenReserve));
         const liquidity = (Number(avgPrice) * (Number(tokenInEth))) / Number(1e18) + Number(formatEther(BigInt(reserve.ethReserve)));
-        return liquidity.toString();
+        return parseEther(String(liquidity)).toString();
     }
 
     private getAvgPrice(buyPrice: string, sellPrice: string): string {
