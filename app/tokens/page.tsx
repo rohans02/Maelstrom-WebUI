@@ -3,8 +3,15 @@
 import { Header } from "@/components/header";
 import { TokenList } from "@/components/tokens/TokenList";
 import { Card, CardContent } from "@/components/ui/card";
+import { useSearchParams } from "next/navigation";
+import TokenPage from "./pool-detail";
 
 export default function TokensPage() {
+  const searchParams = useSearchParams();
+  const tokenAddress = searchParams.get("tokenAddress");
+  if (tokenAddress) {
+    return <TokenPage tokenAddress={tokenAddress} />;
+  }
   return (
     <div className="min-h-screen overflow-hidden bg-gradient-pattern relative">
       <Header />

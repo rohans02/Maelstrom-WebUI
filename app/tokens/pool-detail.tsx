@@ -8,7 +8,6 @@ import { LiquidityActions } from "@/components/tokens/liquidity-actions";
 import { PriceCharts } from "@/components/tokens/price-charts";
 import { TokenPageSkeleton } from "@/components/tokens/token-page-skeleton";
 import { CSSProperties, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ContractClient } from "@/lib/contract-client";
 import { CONTRACT_ADDRESS } from "@/types/contract";
@@ -16,7 +15,11 @@ import { Pool } from "@/types/pool";
 import { Address } from "viem";
 import { Token } from "@/types/token";
 
-export default function TokenPage() {
+interface TokenPageProps {
+  tokenAddress: string;
+}
+
+export default function TokenPage({ tokenAddress }: TokenPageProps) {
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const contractClient = new ContractClient(
@@ -25,8 +28,6 @@ export default function TokenPage() {
     publicClient
   );
   const { address } = useAccount();
-  const searchParams = useSearchParams();
-  const tokenAddress = searchParams.get("tokenAddress");
   const [token, setToken] = useState<Token | null>(null);
   const [pool, setPool] = useState<Pool | null>(null);
   const [loading, setLoading] = useState(true);
