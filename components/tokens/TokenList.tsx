@@ -12,6 +12,7 @@ import { RowPool } from "@/types/pool";
 import { debounce } from "lodash";
 import { Input } from "../ui/input";
 import { toast } from "sonner";
+import Link from "next/link";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -208,7 +209,16 @@ export function TokenList() {
         ))}
       </div>
 
-      {/* Loading indicator for infinite scroll */}
+      <div className="flex justify-end pt-4">
+        <Link
+          href="/create"
+          className="relative z-50 p-2 rounded-2xl bg-accent hover:bg-accent-cyan-2 text-accent-foreground glow-primary"
+        >
+          Create Pool
+        </Link>
+      </div>
+
+      {/* Loading indicator for infinite scroll
       {!search && (
         <div ref={observerRef} className="py-4 flex justify-center">
           {isLoadingMore && (
@@ -225,7 +235,7 @@ export function TokenList() {
             </div>
           )}
         </div>
-      )}
+      )} */}
     </div>
   );
 }

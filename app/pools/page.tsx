@@ -21,7 +21,7 @@ export default function TokensPage() {
               Liquidity Pools
             </h1>
             <p className="text-lg text-white/60 max-w-2xl mx-auto font-plus-jakarta">
-              Browse and interact with liquidity pools across the protocol,
+              Provide liquidity for any token with liquidity pools across the protocol,
               monitor performance, and find trading opportunities.
             </p>
           </div>
