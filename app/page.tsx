@@ -8,7 +8,7 @@ export default function LandingPage() {
       <main className="bg-gradient-pattern overflow-hidden">
         <HeroSection />
         <ValuePropsSection />
-        <StatsSection />
+        {/* <StatsSection /> */}
       </main>
     </div>
   )

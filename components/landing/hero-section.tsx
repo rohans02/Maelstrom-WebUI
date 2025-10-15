@@ -9,14 +9,16 @@ import { WaveRippleCanvas } from "../ui/wave-ripple-canvas";
 
 export function HeroSection() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [textPositions, setTextPositions] = useState<Array<{
-    text: string;
-    size: number;
-    x: number;
-    y: number;
-    font?: string;
-    weight?: string;
-  }>>([]);
+  const [textPositions, setTextPositions] = useState<
+    Array<{
+      text: string;
+      size: number;
+      x: number;
+      y: number;
+      font?: string;
+      weight?: string;
+    }>
+  >([]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -29,27 +31,27 @@ export function HeroSection() {
       const centerY = window.innerHeight / 2;
       setTextPositions([
         {
-          text: "Liquid Trading",
+          text: "Auction-Based",
           size: 100,
           x: window.innerWidth / 2,
           y: centerY - 55, // Adjusted position
-          weight: '700'
+          weight: "700",
         },
         {
-          text: "Redefined",
+          text: "Liquidity Pools",
           size: 100,
           x: window.innerWidth / 2,
           y: centerY + 45, // Adjusted position
-          weight: '700'
+          weight: "700",
         },
         {
-          text: "Experience the future of DeFi with fluid price discoverey",
+          text: "Automated Market Making with Proper Price Discovery",
           size: 28,
           x: window.innerWidth / 2,
           y: centerY + 120, // Adjusted position
-          font: 'Plus Jakarta Sans, sans-serif',
-          weight: '500'
-        }
+          font: "Plus Jakarta Sans, sans-serif",
+          weight: "500",
+        },
       ]);
     };
 
@@ -67,8 +69,8 @@ export function HeroSection() {
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#001233]">
       {/* Wave Ripple Effect */}
       <div className="absolute inset-0 z-10">
-        <WaveRippleCanvas 
-          mousePosition={mousePosition} 
+        <WaveRippleCanvas
+          mousePosition={mousePosition}
           texts={textPositions}
           className="opacity-90"
         />
@@ -83,7 +85,7 @@ export function HeroSection() {
           {/* Animated Circular Text - Positioned above */}
           <div className="absolute top-[-50px] left-1/2 transform -translate-x-1/2">
             <CircularText
-              text="MAELSTROM*LIQUIDITY*"
+              text="MAELSTROM*EXCHANGE*"
               onHover="speedUp"
               spinDuration={20}
               className="custom-class"
@@ -92,7 +94,7 @@ export function HeroSection() {
 
           {/* Hidden but accessible text */}
           <div className="sr-only">
-            <h1>MAELSTROM LIQUIDITY</h1>
+            <h1>MAELSTROM EXCHANGE</h1>
             <p>Next Generation DeFi Protocol</p>
           </div>
 
@@ -107,14 +109,14 @@ export function HeroSection() {
               className="bg-accent hover:bg-accent-cyan-2 text-accent-foreground glow-primary"
             >
               <Link href="/swap">
-                Enter App
+                Swap
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
           </div>
 
           {/* Trust Indicators - Below CTA buttons */}
-          <div className="pt-8 flex flex-wrap justify-center items-center gap-8 text-sm text-muted-foreground">
+          {/* <div className="pt-8 flex flex-wrap justify-center items-center gap-8 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <span>Audited Smart Contracts</span>
@@ -127,7 +129,7 @@ export function HeroSection() {
               <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
               <span>Zero Slippage Trading</span>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </section>
