@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Clock, Zap } from "lucide-react";
+import { ArrowRight, Zap } from "lucide-react";
 import { Token } from "@/types/token";
 
 interface SwapPreviewModalProps {
@@ -77,20 +77,8 @@ export function SwapPreviewModal({
           </Card>
 
           {/* Swap Details */}
-          <div className="space-y-3 p-4 bg-white/[0.02] rounded-xl border border-white/[0.05] backdrop-blur-sm">
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-accent-cyan" />
-                <span className="text-white/70 font-medium font-plus-jakarta">
-                  Network Fee
-                </span>
-              </div>
-              <span className="text-white/90 font-medium font-plus-jakarta">
-                ~$12.50
-              </span>
-            </div>
-
-            {slippageTolerance && (
+          {slippageTolerance && (
+            <div className="space-y-3 p-4 bg-white/[0.02] rounded-xl border border-white/[0.05] backdrop-blur-sm">
               <div>
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
@@ -119,8 +107,8 @@ export function SwapPreviewModal({
                   </span>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-2">

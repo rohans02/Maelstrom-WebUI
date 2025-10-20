@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TokenSelector } from "@/components/swap/token-selector";
 import { SwapPreviewModal } from "@/components/swap/swap-preview-modal";
@@ -9,14 +9,19 @@ import { SellForm } from "@/components/swap/sell-form";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { ArrowDownUp, Settings } from "lucide-react";
+import { ArrowDownUp, Settings, Shield, HelpCircle } from "lucide-react";
 import { ContractClient } from "@/lib/contract-client";
-import { CONTRACT_ADDRESS } from "@/types/contract";
-import { usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { Token } from "@/types/token";
 import { BuyRequest, SellRequest, SwapRequest } from "@/types/trades";
 import { ETH_ROW_POOL, RowPool } from "@/types/pool";
-import { parseEther } from "viem";
+import { formatEther, parseEther } from "viem";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SwapState {
   tokenIn: Token | undefined;
@@ -28,13 +33,15 @@ interface SwapState {
 const ITEMS_PER_PAGE = 10;
 
 export function SwapInterface() {
+  const { chainId } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
-  const contractClient = new ContractClient(
-    CONTRACT_ADDRESS,
-    writeContractAsync,
-    publicClient
+  const contractClient = useMemo(
+    () => new ContractClient(writeContractAsync, publicClient, chainId),
+    [chainId]
   );
+  const { chain } = useAccount();
+  const baseUrl = chain?.blockExplorers?.default.url;
   const [swapState, setSwapState] = useState<SwapState>({
     tokenIn: undefined,
     tokenOut: undefined,
@@ -50,10 +57,19 @@ export function SwapInterface() {
   const [loading, setLoading] = useState(false);
   const [tokenInSellPrice, setTokenInSellPrice] = useState<number>(0);
   const [tokenOutBuyPrice, setTokenOutBuyPrice] = useState<number>(0);
+  const [ethInReserve, setEthInReserve] = useState<string | undefined>(
+    undefined
+  );
+  const [tokenOutReserve, setTokenOutReserve] = useState<string | undefined>(
+    undefined
+  );
   const [fetchingRates, setFetchingRates] = useState(false);
-  const [slippageTolerance, setSlippageTolerance] = useState<number>(0.5); // Default 0.5%
+  const [slippageTolerance, setSlippageTolerance] = useState<number>(0); // Start at 0 for zero slippage mode
+  const [validationError, setValidationError] = useState<string>("");
+  const [zeroSlippageMode, setZeroSlippageMode] = useState<boolean>(true); // Default to zero slippage mode
 
   const calculateOutput = (amount: string, isInput: boolean) => {
+    setValidationError("");
     if (!amount || !tokenInSellPrice || !tokenOutBuyPrice) return "";
 
     const amountNum = Number(amount);
@@ -61,11 +77,77 @@ export function SwapInterface() {
 
     if (isInput) {
       // Converting tokenIn to tokenOut: amount * sellPrice / buyPrice
-      const output = (amountNum * tokenInSellPrice) / tokenOutBuyPrice;
+      const ethAmount = amountNum * tokenInSellPrice;
+
+      if (ethInReserve) {
+        // Ensure we don't exceed the ethIn reserve by more than 10%
+        const maxEthAllowed = Number(ethInReserve) * 0.1;
+        if (ethAmount > maxEthAllowed) {
+          const maxTokenIn = maxEthAllowed / tokenInSellPrice;
+          console.log(maxTokenIn);
+          setValidationError(
+            `Amount exceeds 10% of reserve. Maximum: ${maxTokenIn.toFixed(6)} ${
+              swapState.tokenIn?.symbol || ""
+            }`
+          );
+          return "";
+        }
+      }
+
+      const output = ethAmount / tokenOutBuyPrice;
+
+      if (tokenOutReserve) {
+        // Ensure we don't exceed the tokenOut reserve by more than 10%
+        const maxTokenOutAllowed = Number(tokenOutReserve) * 0.1;
+        if (output * 1e18 > maxTokenOutAllowed) {
+          const maxInput = Math.round(
+            (maxTokenOutAllowed * tokenOutBuyPrice) / tokenInSellPrice
+          );
+          setValidationError(
+            `Output exceeds 10% of reserve. Maximum input: ${formatEther(
+              BigInt(maxInput)
+            )} ${swapState.tokenOut?.symbol || ""}`
+          );
+          return "";
+        }
+      }
+
+      setValidationError("");
       return output.toString();
     } else {
       // Converting tokenOut to tokenIn: amount * buyPrice / sellPrice
-      const output = (amountNum * tokenOutBuyPrice) / tokenInSellPrice;
+
+      if (tokenOutReserve) {
+        // Ensure we don't exceed the tokenOut reserve by more than 10%
+        const maxTokenOutAllowed = Number(tokenOutReserve) * 0.1;
+        if (amountNum * 1e18 > maxTokenOutAllowed) {
+          setValidationError(
+            `Amount exceeds 10% of reserve. Maximum: ${formatEther(
+              BigInt(maxTokenOutAllowed)
+            )} ${swapState.tokenOut?.symbol || ""}`
+          );
+          return "";
+        }
+      }
+
+      const ethAmount = amountNum * tokenOutBuyPrice;
+
+      if (ethInReserve) {
+        // Ensure we don't exceed the ethIn reserve by more than 10%
+        const maxEthAllowed = Number(ethInReserve) * 0.1;
+        if (ethAmount > maxEthAllowed) {
+          const maxTokenOut = maxEthAllowed / tokenOutBuyPrice;
+          setValidationError(
+            `Output exceeds 10% of reserve. Maximum output: ${maxTokenOut.toFixed(
+              6
+            )} ${swapState.tokenOut?.symbol || ""}`
+          );
+          return "";
+        }
+      }
+
+      const output = ethAmount / tokenInSellPrice;
+      setValidationError("");
       return output.toString();
     }
   };
@@ -89,15 +171,19 @@ export function SwapInterface() {
   const handletokenInChange = async (token: Token) => {
     try {
       setFetchingRates(true);
+      setValidationError(""); // Clear validation error when changing tokens
       let sellPrice = parseEther("1").toString();
+      let reserve = undefined;
       if (!(token.name === "Ether" && token.symbol === "ETH")) {
         sellPrice = await contractClient.getSellPrice(token);
+        reserve = await contractClient.getReserves(token);
       }
 
       const newSellPrice = Number(sellPrice);
       const newExchangeRate = tokenOutBuyPrice / newSellPrice;
 
       setTokenInSellPrice(newSellPrice);
+      setEthInReserve(reserve?.ethReserve);
 
       setSwapState((prev) => {
         const formattedExchangeRate =
@@ -124,14 +210,17 @@ export function SwapInterface() {
   const handletokenOutChange = async (token: Token) => {
     try {
       setFetchingRates(true);
+      setValidationError(""); // Clear validation error when changing tokens
       let buyPrice = parseEther("1").toString();
+      let reserve = undefined;
       if (!(token.name === "Ether" && token.symbol === "ETH")) {
         buyPrice = await contractClient.getBuyPrice(token);
+        reserve = await contractClient.getReserves(token);
       }
 
       const newBuyPrice = Number(buyPrice);
       const newExchangeRate = newBuyPrice / tokenInSellPrice;
-
+      setTokenOutReserve(reserve?.tokenReserve);
       setTokenOutBuyPrice(newBuyPrice);
 
       setSwapState((prev) => {
@@ -159,6 +248,7 @@ export function SwapInterface() {
   const handleSwapTokens = async () => {
     if (!swapState.tokenOut || !swapState.tokenIn) return;
     setIsSwapping(true);
+    setValidationError(""); // Clear validation error when swapping
     try {
       // Store the current tokens before swapping
       const currentTokenIn = swapState.tokenIn;
@@ -205,7 +295,8 @@ export function SwapInterface() {
 
     // Calculate minimum tokens out with slippage tolerance
     const amountOutNum = parseFloat(swapState.amountOut);
-    const slippageMultiplier = (100 - slippageTolerance) / 100;
+    const effectiveSlippage = zeroSlippageMode ? 0 : slippageTolerance;
+    const slippageMultiplier = (100 - effectiveSlippage) / 100;
     const minimumTokenOut = (amountOutNum * slippageMultiplier).toString();
 
     if (
@@ -215,11 +306,26 @@ export function SwapInterface() {
       if (swapState.tokenIn.symbol == "ETH") {
         const buyRequest: BuyRequest = {
           token: swapState.tokenOut,
-          amountIn: parseEther(swapState.amountIn).toString(),
+          amountIn: (Math.round(Number(swapState.amountIn) * 1e18 )).toString(),
+          minimumAmountToBuy: (Math.round(Number(minimumTokenOut) * 1e18)).toString(),
         };
         const result = await contractClient.buy(buyRequest);
         if (result.success) {
-          toast.success(`Swap Successful! Tx Hash: ${result.txHash}`);
+          toast.success(
+            <div>
+              <div>Swap Successful! </div>
+              <div>
+                <a
+                  href={`${baseUrl}/tx/${result.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline text-blue-400"
+                >
+                  View on block explorer
+                </a>
+              </div>
+            </div>
+          );
         } else {
           toast.error(
             `Swap Failed!: ${
@@ -233,11 +339,26 @@ export function SwapInterface() {
       if (swapState.tokenOut.symbol == "ETH") {
         const sellRequest: SellRequest = {
           token: swapState.tokenIn,
-          amountIn: parseEther(swapState.amountIn).toString(),
+          amountIn: (Math.round(Number(swapState.amountIn) * 1e18 )).toString(),
+          minimumEthAmount: (Math.round(Number(minimumTokenOut) * 1e18)).toString(),
         };
         const result = await contractClient.sell(sellRequest);
         if (result.success) {
-          toast.success(`Swap Successful! Tx Hash: ${result.txHash}`);
+          toast.success(
+            <div>
+              <div>Swap Successful! </div>
+              <div>
+                <a
+                  href={`${baseUrl}/tx/${result.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline text-blue-400"
+                >
+                  View on block explorer
+                </a>
+              </div>
+            </div>
+          );
         } else {
           toast.error(
             `Swap Failed!: ${
@@ -252,12 +373,24 @@ export function SwapInterface() {
     const swapRequest: SwapRequest = {
       tokenIn: swapState.tokenIn,
       tokenOut: swapState.tokenOut,
-      amountIn: parseEther(swapState.amountIn).toString(),
-      minimumTokenOut: parseEther(minimumTokenOut).toString(),
+      amountIn: (Math.round(Number(swapState.amountIn) * 1e18 )).toString(),
+      minimumTokenOut: (Math.round(Number(minimumTokenOut) * 1e18)).toString(),
     };
     const result = await contractClient.swap(swapRequest);
     if (result.success) {
-      toast.success(`Swap Successful! Tx Hash: ${result.txHash}`);
+      toast.success(
+        <div>
+          Swap Successful!{" "}
+          <a
+            href={`${baseUrl}/tx/${result.txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-blue-400"
+          >
+            View on block explorer
+          </a>
+        </div>
+      );
     } else {
       toast.error(
         `Swap Failed!: ${
@@ -373,6 +506,62 @@ export function SwapInterface() {
                     Sell
                   </TabsTrigger>
                 </TabsList>
+                <div className="flex items-center justify-end">
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={zeroSlippageMode}
+                      onChange={(e) => {
+                        setZeroSlippageMode(e.target.checked);
+                        if (e.target.checked) {
+                          setSlippageTolerance(0);
+                        } else {
+                          setSlippageTolerance(0.5); // Default to 0.5% when unchecked
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                    <div
+                      className={`relative w-5 h-5 rounded border-2 transition-all duration-300 flex items-center justify-center ${
+                        zeroSlippageMode
+                          ? "bg-gradient-to-br from-accent-cyan/20 to-primary-500/20 border-accent-cyan shadow-lg shadow-accent-cyan/25"
+                          : "bg-white/5 border-white/20 hover:border-white/30"
+                      }`}
+                    >
+                      {zeroSlippageMode && (
+                        <svg
+                          className="w-3.5 h-3.5 text-accent-cyan"
+                          fill="none"
+                          strokeWidth="3"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Shield
+                        className={`h-4 w-4 transition-colors duration-300 ${
+                          zeroSlippageMode
+                            ? "text-accent-cyan"
+                            : "text-white/40"
+                        }`}
+                      />
+                      <span
+                        className={`text-sm font-medium transition-colors duration-300 ${
+                          zeroSlippageMode ? "text-white/90" : "text-white/50"
+                        }`}
+                      >
+                        Zero Slippage Mode
+                      </span>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               <TabsContent value="swap" className="mt-2">
@@ -399,12 +588,40 @@ export function SwapInterface() {
                           isSwapping
                         }
                         onChange={(e) => handleAmountInChange(e.target.value)}
-                        className="w-full h-16 text-3xl font-medium bg-black/10 group-hover:bg-black/20 rounded-xl px-4 
-                          border border-white/[0.05] focus:border-accent-cyan/30 focus:ring-2 focus:ring-accent-cyan/20
-                          placeholder:text-white/20 transition-all duration-300 font-plus-jakarta"
+                        className={`w-full h-16 text-3xl font-medium bg-black/10 group-hover:bg-black/20 rounded-xl px-4 
+                          border ${
+                            validationError
+                              ? "border-red-500/50 focus:border-red-500/70 focus:ring-2 focus:ring-red-500/20"
+                              : "border-white/[0.05] focus:border-accent-cyan/30 focus:ring-2 focus:ring-accent-cyan/20"
+                          }
+                          placeholder:text-white/20 transition-all duration-300 font-plus-jakarta`}
                       />
                     </div>
                   </div>
+
+                  {/* Validation Error Message */}
+                  {validationError && (
+                    <div className="px-1 py-2 -my-1">
+                      <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl backdrop-blur-sm">
+                        <svg
+                          className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5"
+                          fill="none"
+                          strokeWidth="2"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                          />
+                        </svg>
+                        <p className="text-sm text-red-300 font-medium">
+                          {validationError}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Swap Button */}
                   <div className="flex justify-center -my-3 relative z-10">
@@ -460,60 +677,79 @@ export function SwapInterface() {
                         <span className="text-white/50 font-medium">Rate</span>
                         <span className="text-white/80 font-medium">
                           1 {swapState.tokenIn!.symbol.toUpperCase()} ={" "}
-                          {(Number(swapState.amountOut) / Number(swapState.amountIn))}{" "}
+                          {Number(swapState.amountOut) /
+                            Number(swapState.amountIn)}{" "}
                           {swapState.tokenOut!.symbol.toUpperCase()}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/50 font-medium">Fee</span>
-                        <span className="text-white/80 font-medium">
-                          ~$12.50
-                        </span>
-                      </div>
+                      {/* Slippage Tolerance - Only show in Advanced Mode */}
+                      {!zeroSlippageMode && (
+                        <div className="space-y-3 pt-2 border-t border-white/[0.05]">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-white/50 font-medium flex items-center gap-2">
+                              <Settings className="h-4 w-4" />
+                              Slippage Tolerance
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="h-3.5 w-3.5 text-white/30 hover:text-white/50 transition-colors cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs bg-gradient-to-b from-bg-800/95 to-bg-900/95 border border-white/10 p-3 backdrop-blur-xl">
+                                    <p className="text-sm text-white/90 leading-relaxed">
+                                      <span className="font-semibold text-accent-cyan">
+                                        Auction-Based Slippage:
+                                      </span>{" "}
+                                      If transactions occur before yours, the
+                                      price may change. You might receive more
+                                      or less tokens than expected. Increasing
+                                      slippage tolerance raises the chance your
+                                      transaction succeeds, as it will execute
+                                      if the final amount is above your minimum
+                                      acceptable threshold.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </span>
+                            <span className="text-white/80 font-medium">
+                              {slippageTolerance}%
+                            </span>
+                          </div>
 
-                      {/* Slippage Tolerance */}
-                      <div className="space-y-3 pt-2 border-t border-white/[0.05]">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-white/50 font-medium flex items-center gap-2">
-                            <Settings className="h-4 w-4" />
-                            Slippage Tolerance
-                          </span>
-                          <span className="text-white/80 font-medium">
-                            {slippageTolerance}%
-                          </span>
-                        </div>
-                        <div className="px-1">
-                          <Slider
-                            value={[slippageTolerance]}
-                            onValueChange={(value) =>
-                              setSlippageTolerance(value[0])
-                            }
-                            min={0.1}
-                            max={5.0}
-                            step={0.1}
-                            className="w-full [&_[data-slot=slider-track]]:bg-white/10 [&_[data-slot=slider-range]]:bg-gradient-to-r [&_[data-slot=slider-range]]:from-accent-cyan [&_[data-slot=slider-range]]:to-primary-500 [&_[data-slot=slider-thumb]]:border-accent-cyan/50 [&_[data-slot=slider-thumb]]:bg-gradient-to-b [&_[data-slot=slider-thumb]]:from-accent-cyan/20 [&_[data-slot=slider-thumb]]:to-primary-600/20 [&_[data-slot=slider-thumb]]:shadow-lg [&_[data-slot=slider-thumb]]:shadow-accent-cyan/25"
-                          />
-                          <div className="flex justify-between text-xs text-white/30 mt-1">
-                            <span>0.1%</span>
-                            <span>5.0%</span>
+                          <div className="px-1">
+                            <Slider
+                              value={[slippageTolerance]}
+                              onValueChange={(value) =>
+                                setSlippageTolerance(value[0])
+                              }
+                              min={0.1}
+                              max={5.0}
+                              step={0.1}
+                              className="w-full [&_[data-slot=slider-track]]:bg-white/10 [&_[data-slot=slider-range]]:bg-gradient-to-r [&_[data-slot=slider-range]]:from-accent-cyan [&_[data-slot=slider-range]]:to-primary-500 [&_[data-slot=slider-thumb]]:border-accent-cyan/50 [&_[data-slot=slider-thumb]]:bg-gradient-to-b [&_[data-slot=slider-thumb]]:from-accent-cyan/20 [&_[data-slot=slider-thumb]]:to-primary-600/20 [&_[data-slot=slider-thumb]]:shadow-lg [&_[data-slot=slider-thumb]]:shadow-accent-cyan/25"
+                            />
+                            <div className="flex justify-between text-xs text-white/30 mt-1">
+                              <span>0.1%</span>
+                              <span>5.0%</span>
+                            </div>
                           </div>
+
+                          {swapState.tokenOut && swapState.amountIn && (
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-white/40">
+                                Minimum received:
+                              </span>
+                              <span className="text-white/60">
+                                {(
+                                  (parseFloat(swapState.amountOut) *
+                                    (100 - slippageTolerance)) /
+                                  100
+                                ).toFixed(6)}{" "}
+                                {swapState.tokenOut.symbol.toUpperCase()}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        {swapState.tokenOut && (
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-white/40">
-                              Minimum received:
-                            </span>
-                            <span className="text-white/60">
-                              {(
-                                (parseFloat(swapState.amountOut) *
-                                  (100 - slippageTolerance)) /
-                                100
-                              ).toFixed(6)}{" "}
-                              {swapState.tokenOut.symbol.toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -524,7 +760,8 @@ export function SwapInterface() {
                     !swapState.amountIn ||
                     !swapState.amountOut ||
                     isSwapping ||
-                    loading
+                    loading ||
+                    !!validationError
                   }
                   className="w-full h-14 mt-6 bg-gradient-to-r from-accent-cyan to-primary-500 hover:from-accent-cyan/90 hover:to-primary-500/90 
                     text-white font-semibold rounded-xl shadow-lg hover:shadow-accent-cyan/25 transition-all duration-300 
@@ -533,6 +770,8 @@ export function SwapInterface() {
                 >
                   {isSwapping ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/20 border-t-white" />
+                  ) : validationError ? (
+                    "Invalid Amount"
                   ) : (
                     "Preview Swap"
                   )}
@@ -545,6 +784,10 @@ export function SwapInterface() {
                   handleTokenOutChange={handletokenOutChange}
                   buyPrice={tokenOutBuyPrice.toString()}
                   isFetchingRates={fetchingRates}
+                  tokenOutReserve={tokenOutReserve}
+                  zeroSlippageMode={zeroSlippageMode}
+                  slippageTolerance={slippageTolerance}
+                  setSlippageTolerance={setSlippageTolerance}
                 />
               </TabsContent>
 
@@ -554,6 +797,10 @@ export function SwapInterface() {
                   handleTokenInChange={handletokenInChange}
                   sellPrice={tokenInSellPrice.toString()}
                   isFetchingRates={fetchingRates}
+                  ethInReserve={ethInReserve}
+                  zeroSlippageMode={zeroSlippageMode}
+                  slippageTolerance={slippageTolerance}
+                  setSlippageTolerance={setSlippageTolerance}
                 />
               </TabsContent>
             </Tabs>
@@ -568,7 +815,9 @@ export function SwapInterface() {
             amountIn={swapState.amountIn}
             amountOut={swapState.amountOut}
             loading={loading}
-            slippageTolerance={slippageTolerance}
+            slippageTolerance={
+              !zeroSlippageMode ? slippageTolerance : undefined
+            }
           />
         </div>
       </div>

@@ -6,26 +6,27 @@ import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ContractClient } from "@/lib/contract-client";
-import { CONTRACT_ADDRESS } from "@/types/contract";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RowPool } from "@/types/pool";
 import { toast } from "sonner";
 import { formatEther } from "viem";
 import { Deposit, Withdraw } from "@/types/trades";
 
 export default function DashboardPage() {
+  const { chainId } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
-  const contractClient = new ContractClient(
-    CONTRACT_ADDRESS,
-    writeContractAsync,
-    publicClient
-  );
+  const contractClient = useMemo(
+      () => new ContractClient(
+        writeContractAsync,
+        publicClient,
+        chainId
+      ),
+      [chainId]
+    );
   const { address } = useAccount();
   const [totalPools, setTotalPools] = useState<number>(0);
-  const [totalLiquidity, setTotalLiquidity] = useState<string>("0");
   const [portfolioValue, setPortfolioValue] = useState<string>("0");
-  const [totalProfit, setTotalProfit] = useState<string>("0");
   const [events, setEvents] = useState<(Deposit | Withdraw)[]>([]);
   const [pools, setPools] = useState<RowPool[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -69,7 +70,7 @@ export default function DashboardPage() {
       const currentBlock = await publicClient?.getBlock();
       if (!currentBlock) return;
       const deposits = await contractClient.getDepositEventLogs(
-        Number(currentBlock.number) - 1000,
+        Number(currentBlock.number) - 999,
         Number(currentBlock.number),
         undefined,
         address
@@ -87,7 +88,7 @@ export default function DashboardPage() {
       const currentBlock = await publicClient?.getBlock();
       if (!currentBlock) return;
       const withdrawals = await contractClient.getWithdrawEventLogs(
-        Number(currentBlock.number) - 1000,
+        Number(currentBlock.number) - 999,
         Number(currentBlock.number),
         undefined,
         address
@@ -111,14 +112,6 @@ export default function DashboardPage() {
     return formatEther(BigInt(total));
   };
 
-  const calculateProfit = (portfolio: string, liquidity: string) => {
-    const portfolioNum = Number(portfolio);
-    const liquidityNum = Number(liquidity);
-    if (liquidityNum === 0) return "0.00";
-    const gain = ((portfolioNum - liquidityNum) / liquidityNum) * 100;
-    return gain.toFixed(2);
-  };
-
   useEffect(() => {
     if (!address) return;
 
@@ -131,10 +124,6 @@ export default function DashboardPage() {
         if (count === undefined) throw new Error("Pool count is undefined");
         
         await fetchUserPools(count);
-        const liquidity = await contractClient.getUserLiquidity(address);
-        const liquidityFormatted = formatEther(BigInt(liquidity));
-        setTotalLiquidity(liquidityFormatted);
-        
         await fetchRecentDeposits();
         await fetchRecentWithdrawals();
         
@@ -149,15 +138,12 @@ export default function DashboardPage() {
     fetchData();
   }, [address]);
 
-  // Separate effect to calculate values when pools or liquidity changes
   useEffect(() => {
-    if (pools.length > 0 && totalLiquidity !== "0") {
+    if (pools.length > 0) {
       const portfolio = calculatePortfolioValue(pools);
       setPortfolioValue(portfolio);
-      const profit = calculateProfit(portfolio, totalLiquidity);
-      setTotalProfit(profit);
     }
-  }, [pools, totalLiquidity]);
+  }, [pools]);
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -189,8 +175,8 @@ export default function DashboardPage() {
           {/* Overview Cards */}
           <DashboardOverview
             portfolioValue={portfolioValue}
-            totalLiquidity={totalLiquidity}
-            profit={totalProfit}
+            // totalLiquidity={totalLiquidity}
+            // profit={totalProfit}
             activePools={totalPools.toString()}
             loading={isLoading}
           />

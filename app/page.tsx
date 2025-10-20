@@ -1,6 +1,5 @@
 import { HeroSection } from "@/components/landing/hero-section"
 import { ValuePropsSection } from "@/components/landing/value-props-section"
-import { StatsSection } from "@/components/landing/stats-section"
 
 export default function LandingPage() {
   return (
@@ -8,7 +7,7 @@ export default function LandingPage() {
       <main className="bg-gradient-pattern overflow-hidden">
         <HeroSection />
         <ValuePropsSection />
-        <StatsSection />
+        {/* <StatsSection /> */}
       </main>
     </div>
   )

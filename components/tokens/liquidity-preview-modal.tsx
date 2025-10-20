@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Clock, Zap } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Token } from "@/types/token";
 
 interface LiquidityPreviewModalProps {
@@ -36,56 +36,56 @@ export function LiquidityPreviewModal({
 }: LiquidityPreviewModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md border border-white/[0.05] bg-gradient-to-b from-bg-800/95 to-bg-900/95 backdrop-blur-xl shadow-2xl">
+      <DialogContent className="border border-white/[0.05] bg-gradient-to-b from-bg-800/95 to-bg-900/95 backdrop-blur-xl shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold font-plus-jakarta text-white/90">
             {isWithdraw ? "Remove Liquidity Preview" : "Add Liquidity Preview"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* Liquidity Summary */}
-          <Card className="bg-gradient-to-r from-accent-cyan/[0.03] to-primary-500/[0.03] border border-white/[0.05] shadow-lg backdrop-blur-sm">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div className="text-center">
+          <Card className="bg-gradient-to-r from-accent-cyan/[0.03] to-primary-500/[0.03] border border-white/[0.05] backdrop-blur-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-center flex-1 min-w-0">
                   <p className="text-sm text-white/60 font-medium mb-1 font-plus-jakarta">
                     {isWithdraw ? "You remove" : "You provide"}
                   </p>
                   {isWithdraw ? (
-                    <p className="text-lg font-semibold text-white/90 font-plus-jakarta">
+                    <p className="text-base font-semibold text-white/90 font-plus-jakarta">
                       {lpAmount} LP
                     </p>
                   ) : (
                     <div className="space-y-1">
-                      <p className="text-lg font-semibold text-white/90 font-plus-jakarta">
+                      <p className="text-base font-semibold text-white/90 font-plus-jakarta break-words">
                         {tokenAmount} {token.symbol.toUpperCase()}
                       </p>
-                      <p className="text-lg font-semibold text-white/90 font-plus-jakarta">
+                      <p className="text-base font-semibold text-white/90 font-plus-jakarta">
                         {ethAmount} ETH
                       </p>
                     </div>
                   )}
                 </div>
-                <div className="relative px-4">
+                <div className="relative px-3 flex-shrink-0">
                   <div className="absolute inset-0 bg-accent-cyan/10 blur-[20px] rounded-full" />
-                  <ArrowRight className="h-6 w-6 text-accent-cyan relative z-10" />
+                  <ArrowRight className="h-5 w-5 text-accent-cyan relative z-10" />
                 </div>
-                <div className="text-center">
+                <div className="text-center flex-1 min-w-0">
                   <p className="text-sm text-white/60 font-medium mb-1 font-plus-jakarta">
                     {isWithdraw ? "You receive" : "You get"}
                   </p>
                   {isWithdraw ? (
                     <div className="space-y-1">
-                      <p className="text-lg font-semibold text-white/90 font-plus-jakarta">
+                      <p className="text-base font-semibold text-white/90 font-plus-jakarta break-words">
                         {tokenAmount} {token.symbol.toUpperCase()}
                       </p>
-                      <p className="text-lg font-semibold text-white/90 font-plus-jakarta">
+                      <p className="text-base font-semibold text-white/90 font-plus-jakarta">
                         {ethAmount} ETH
                       </p>
                     </div>
                   ) : (
-                    <p className="text-lg font-semibold text-white/90 font-plus-jakarta">
+                    <p className="text-base font-semibold text-white/90 font-plus-jakarta">
                       {lpAmount} LP
                     </p>
                   )}
@@ -95,7 +95,7 @@ export function LiquidityPreviewModal({
           </Card>
 
           {/* Transaction Details */}
-          <div className="space-y-3 p-4 bg-white/[0.02] rounded-xl border border-white/[0.05] backdrop-blur-sm">
+          {/* <div className="space-y-3 p-4 bg-white/[0.02] rounded-xl border border-white/[0.05] backdrop-blur-sm">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-accent-cyan" />
@@ -110,7 +110,7 @@ export function LiquidityPreviewModal({
               </div>
               <span className="text-white/90 font-medium font-plus-jakarta">0.05%</span>
             </div>
-          </div>
+          </div> */}
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-2">

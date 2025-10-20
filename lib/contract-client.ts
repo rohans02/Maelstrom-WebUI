@@ -1,5 +1,5 @@
-import { ABI, IContractClient } from "@/types/contract";
-import { InitPool, InitPoolResult, Pool, Reserve, RowPool } from "@/types/pool";
+import { ABI, CONTRACT_ADDRESSES, IContractClient } from "@/types/contract";
+import { InitPool, InitPoolResult, Pool, PoolFeesEvent, Reserve, RowPool } from "@/types/pool";
 import { LiquidityPoolToken, Token } from "@/types/token";
 import { BuyRequest, BuyResult, BuyTrade, Deposit, DepositRequest, DepositResult, SellRequest, SellResult, SellTrade, SwapRequest, SwapResult, SwapTrade, Withdraw, WithdrawRequest, WithdrawResult } from "@/types/trades";
 import { Address, erc20Abi, formatEther, parseAbiItem, parseEther } from "viem";
@@ -11,8 +11,8 @@ export class ContractClient implements IContractClient {
     writeContract: WriteContractMutateAsync<Config, unknown>
     publicClient: UsePublicClientReturnType;
 
-    constructor(contractAddress: Address, writeContract: WriteContractMutateAsync<Config, unknown>, publicClient: UsePublicClientReturnType) {
-        this.contractAddress = contractAddress;
+    constructor(writeContract: WriteContractMutateAsync<Config, unknown>, publicClient: UsePublicClientReturnType, chainId?: number) {
+        this.contractAddress = chainId ? CONTRACT_ADDRESSES[chainId] : CONTRACT_ADDRESSES[63];
         this.writeContract = writeContract;
         this.publicClient = publicClient;
     }
@@ -136,7 +136,7 @@ export class ContractClient implements IContractClient {
                 address: this.contractAddress,
                 abi: ABI,
                 functionName: 'buy',
-                args: [buyReq.token.address],
+                args: [buyReq.token.address, BigInt(buyReq.minimumAmountToBuy)],
                 value: BigInt(buyReq.amountIn)
             });
             result.txHash = txHash;
@@ -160,7 +160,7 @@ export class ContractClient implements IContractClient {
                 address: this.contractAddress,
                 abi: ABI,
                 functionName: 'sell',
-                args: [sellReq.token.address, BigInt(sellReq.amountIn)]
+                args: [sellReq.token.address, BigInt(sellReq.amountIn), BigInt(sellReq.minimumEthAmount)]
             })
             result.txHash = txHash;
             return result;
@@ -330,8 +330,8 @@ export class ContractClient implements IContractClient {
         return ((Number(buyPrice) + Number(sellPrice)) / Number(2)).toString();
     }
 
-    private getAPR(volume24h: string, totalLiquidity: string): string {
-        return ((Number(volume24h) * Number(0.03) * Number(365)) / Number(totalLiquidity)).toString();//Custom 3% trade fee
+    private getAPR(poolYield: string): string {
+        return (Number(poolYield) * 365  * 100).toString();
     }
 
     private async getBlockTimestamp(blockNumber: bigint): Promise<number> {
@@ -390,7 +390,7 @@ export class ContractClient implements IContractClient {
                 address: this.contractAddress,
                 fromBlock: BigInt(fromBlock),
                 toBlock: BigInt(toBlock),
-                event: parseAbiItem('event SellTrade(address indexed token, address indexed trader, uint256 ethAmount, uint256 tokenAmount, uint256 sellPrice)'),
+                event: parseAbiItem('event SellTrade(address indexed token, address indexed trader, uint256 tokenAmount, uint256 ethAmount, uint256 sellPrice)'),
                 args: {
                     token: (token?.address as Address),
                     trader: user as Address | undefined
@@ -539,14 +539,14 @@ export class ContractClient implements IContractClient {
     private async get24hBeforeBlock(): Promise<bigint> {
         try {
             let lowBlock = BigInt(0);
-            let highBlock = BigInt(0);
+            let highBlock = await this.publicClient?.getBlockNumber() as bigint;
             while (lowBlock <= highBlock) {
-                const midBlock = (lowBlock + highBlock) / BigInt(2);
-                const midTimestamp = await this.getBlockTimestamp(midBlock);
+                const midBlock = Math.round(Number(lowBlock + highBlock) / 2);
+                const midTimestamp = await this.getBlockTimestamp(BigInt(midBlock));
                 if (Date.now() - midTimestamp < 24 * 60 * 60 * 1000) {
-                    lowBlock = midBlock + BigInt(1);
+                    highBlock = BigInt(midBlock) - BigInt(1);
                 } else {
-                    highBlock = midBlock - BigInt(1);
+                    lowBlock = BigInt(midBlock) + BigInt(1);
                 }
             }
             return lowBlock;
@@ -559,9 +559,29 @@ export class ContractClient implements IContractClient {
         try {
             const toBlock = await this.publicClient?.getBlockNumber();
             const fromBlock = await this.get24hBeforeBlock();
-            const buyLogs = await this.getBuyTradeEventLogs(Number(fromBlock), Number(toBlock), token);
-            const sellLogs = await this.getSellTradeEventLogs(Number(fromBlock), Number(toBlock), token);
-            const swapLogs = await this.getSwapTradeEventLogs(Number(fromBlock), Number(toBlock), token);
+            const BLOCK_BATCH_SIZE = 999;
+            let currentBlock = Number(fromBlock);
+            const targetBlock = Number(toBlock);
+
+            let buyLogs: BuyTrade[] = [];
+            let sellLogs: SellTrade[] = [];
+            let swapLogs: SwapTrade[] = [];
+
+            while (currentBlock < targetBlock) {
+                const batchEndBlock = Math.min(currentBlock + BLOCK_BATCH_SIZE, targetBlock);
+
+                const [batchBuyLogs, batchSellLogs, batchSwapLogs] = await Promise.all([
+                    this.getBuyTradeEventLogs(currentBlock, batchEndBlock, token),
+                    this.getSellTradeEventLogs(currentBlock, batchEndBlock, token),
+                    this.getSwapTradeEventLogs(currentBlock, batchEndBlock, token)
+                ]);
+
+                buyLogs = buyLogs.concat(batchBuyLogs);
+                sellLogs = sellLogs.concat(batchSellLogs);
+                swapLogs = swapLogs.concat(batchSwapLogs);
+
+                currentBlock = batchEndBlock + 1;
+            }
             let volume = 0;
             buyLogs.forEach(log => {
                 volume += Number(log.ethAmount);
@@ -692,8 +712,12 @@ export class ContractClient implements IContractClient {
             const volume24h = await this.get24hVolume(token);
             const avgPrice = this.getAvgPrice(buyPrice, sellPrice);
             const totalLiquidity = this.getTotalLiquidity(avgPrice, reserve);
-            const apr = this.getAPR(volume24h, totalLiquidity);
+            const feeEventsCount = await this.getPoolFeeEventsCount(token);
+            const poolFeesEvents = feeEventsCount > 0 ? await this.getPoolFeeEvents(token, Math.max(feeEventsCount - 10, 0), feeEventsCount - 1) : 0;
+            const poolYield = feeEventsCount > 0 ? this.getYield(poolFeesEvents as PoolFeesEvent[], totalLiquidity) : 0;
+            const apr = this.getAPR(String(poolYield));
             const lastExchangeTs = await this.getLastExchangeTimestamp(token);
+
             return {
                 token: token,
                 reserve: reserve,
@@ -748,19 +772,19 @@ export class ContractClient implements IContractClient {
         }
     }
 
-    async getUserLiquidity(user: Address) : Promise<string> {
-        try {
-            const data = await this.publicClient?.readContract({
-                address: this.contractAddress,
-                abi: ABI,
-                functionName: 'liquidityProvided',
-                args: [user]
-            });
-            return data!.toString();
-        } catch (error) {
-            throw new Error(`Error fetching user liquidity: ${(error as Error).message}`);
-        }
-    }
+    // async getUserLiquidity(user: Address) : Promise<string> {
+    //     try {
+    //         const data = await this.publicClient?.readContract({
+    //             address: this.contractAddress,
+    //             abi: ABI,
+    //             functionName: 'liquidityProvided',
+    //             args: [user]
+    //         });
+    //         return data!.toString();
+    //     } catch (error) {
+    //         throw new Error(`Error fetching user liquidity: ${(error as Error).message}`);
+    //     }
+    // }
 
     async getUserPools(user: Address, startIndex: number, offset: number): Promise<RowPool[]> {
         try {
@@ -808,7 +832,7 @@ export class ContractClient implements IContractClient {
                 abi: ABI,
                 functionName: 'getTotalPools',
                 args: []
-            })
+            });
             return Number(data);
         } catch (error) {
             throw new Error(`Error fetching pool count: ${(error as Error).message}`);
@@ -822,10 +846,83 @@ export class ContractClient implements IContractClient {
                 abi: ABI,
                 functionName: 'getUserTotalPools',
                 args: [user]
-            })
+            });
             return Number(data);
         } catch (error) {
             throw new Error(`Error fetching user pool count: ${(error as Error).message}`);
         }
+    }
+
+    async getTotalFees(): Promise<string> {
+        try {
+            const data = await this.publicClient?.readContract({
+                address: this.contractAddress,
+                abi: ABI,
+                functionName: 'totalFees',
+                args: []
+            });
+            return String(data);
+        } catch (error) {
+            throw new Error(`Error fetching total fee: ${(error as Error).message}`);
+        }
+    }
+
+    async getTotalPoolFee(token: Token): Promise<string> {
+        try {
+            const data = await this.publicClient?.readContract({
+                address: this.contractAddress,
+                abi: ABI,
+                functionName: 'totalPoolFees',
+                args: [token.address]
+            });
+            return String(data);
+        } catch (error) {
+            throw new Error(`Error fetching total pool fee: ${(error as Error).message}`);
+        }
+    }
+
+    private async getPoolFeeEventsCount(token: Token): Promise<number> {
+        try {
+            const data = await this.publicClient?.readContract({
+                address: this.contractAddress,
+                abi: ABI,
+                functionName: 'getPoolFeeEventsCount',
+                args: [token.address]
+            });
+            return Number(data);
+        } catch (error) {
+            throw new Error(`Error fetching pool fee events count: ${(error as Error).message}`);
+        }
+    }
+
+    async getPoolFeeEvents(token: Token, startIndex: number, endIndex: number): Promise<PoolFeesEvent[]> {
+        try {
+            const data = await this.publicClient?.readContract({
+                address: this.contractAddress,
+                abi: ABI,
+                functionName: 'getPoolFeeList',
+                args: [token.address, BigInt(startIndex), BigInt(endIndex)]
+            });
+            const result: PoolFeesEvent[] = [];
+            if(!data) throw new Error("No data returned from readContract");
+            for (let i = 0; i < (data).length; i++) {
+                result.push({
+                    timestamp: Number(data[i].timestamp) * 1000,
+                    fee: (data[i].fee).toString(),
+                });
+            }
+            return result;
+        } catch (error) {
+            throw new Error(`Error fetching pool fee events: ${(error as Error).message}`);
+        }
+    }
+
+    public getYield(feeEvents: PoolFeesEvent[], totalLiquidity: string): number {
+        let totalFees = 0;
+        feeEvents.forEach(event => {
+            totalFees += Number(event.fee);
+        });
+        const totalTime = (feeEvents[feeEvents.length - 1].timestamp - feeEvents[0].timestamp) / (60 * 60 * 24); //days
+        return totalFees / (totalTime * Number(totalLiquidity));
     }
 }

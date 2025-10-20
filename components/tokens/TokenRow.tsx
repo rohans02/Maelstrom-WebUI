@@ -1,7 +1,7 @@
 "use client";
 
 import type { RowPool } from "@/types/pool";
-import { formatCurrency } from "@/types/pool";
+// import { formatCurrency } from "@/types/pool";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { formatEther } from "viem";
@@ -15,7 +15,7 @@ export function TokenRow({ poolToken }: TokenRowProps) {
 
   return (
     <Link
-      href={`/tokens/?tokenAddress=${token.address}`}
+      href={`/pools/?tokenAddress=${token.address}`}
     >
       <div
         className="group relative p-4 rounded-lg backdrop-blur-sm border border-white/[0.05] 
@@ -104,7 +104,7 @@ export function TokenRow({ poolToken }: TokenRowProps) {
           </div>
 
           {/* Price Grid */}
-          <div className="grid grid-cols-3 gap-3 text-center">
+          {/* <div className="grid grid-cols-3 gap-3 text-center">
             <div className="bg-background/30 rounded-lg p-2">
               <div className="text-xs text-muted-foreground/60 mb-1">Buy</div>
               <div className="text-sm font-medium text-emerald-400">
@@ -123,7 +123,7 @@ export function TokenRow({ poolToken }: TokenRowProps) {
                 ${formatCurrency(Number(totalLiquidity))}
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Hover gradient */}

@@ -6,10 +6,9 @@ import { LiquidityBreakdown } from "@/components/tokens/liquidity-breakdown";
 import { LiquidityActions } from "@/components/tokens/liquidity-actions";
 import { PriceCharts } from "@/components/tokens/price-charts";
 import { TokenPageSkeleton } from "@/components/tokens/token-page-skeleton";
-import { CSSProperties, useEffect, useState } from "react";
+import { CSSProperties, useEffect, useMemo, useState } from "react";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ContractClient } from "@/lib/contract-client";
-import { CONTRACT_ADDRESS } from "@/types/contract";
 import { Pool } from "@/types/pool";
 import { Address } from "viem";
 import { Token } from "@/types/token";
@@ -19,12 +18,12 @@ interface TokenPageProps {
 }
 
 export default function TokenPage({ tokenAddress }: TokenPageProps) {
+  const { chainId } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
-  const contractClient = new ContractClient(
-    CONTRACT_ADDRESS,
-    writeContractAsync,
-    publicClient
+  const contractClient = useMemo(
+    () => new ContractClient(writeContractAsync, publicClient, chainId),
+    [chainId]
   );
   const { address } = useAccount();
   const [token, setToken] = useState<Token | null>(null);

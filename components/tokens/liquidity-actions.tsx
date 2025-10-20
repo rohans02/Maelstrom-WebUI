@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { LiquidityPreviewModal } from "./liquidity-preview-modal";
 import { toast } from "sonner";
 import { LiquidityPoolToken, Token } from "@/types/token";
-import { usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ContractClient } from "@/lib/contract-client";
-import { CONTRACT_ADDRESS } from "@/types/contract";
 import { Reserve } from "@/types/pool";
 import { formatEther, parseEther } from "viem";
 
@@ -26,13 +25,15 @@ export function LiquidityActions({
   lpToken,
   poolRatio,
 }: LiquidityActionsProps) {
+  const { chainId } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
-  const contractClient = new ContractClient(
-    CONTRACT_ADDRESS,
-    writeContractAsync,
-    publicClient
+  const contractClient = useMemo(
+    () => new ContractClient(writeContractAsync, publicClient, chainId),
+    [chainId]
   );
+  const { chain } = useAccount();
+  const baseUrl = chain?.blockExplorers?.default.url;
   const [tokenAmount, setTokenAmount] = useState("");
   const [ethAmount, setEthAmount] = useState("");
   const [lpAmount, setLpAmount] = useState("");
@@ -43,6 +44,9 @@ export function LiquidityActions({
   const handleTokenAmountChange = useCallback(
     (value: string) => {
       setTokenAmount(value);
+      console.log(poolRatio)
+      console.log(value)
+      console.log(Number(value) / Number(poolRatio))
       const ethAmount = Number(value) / Number(poolRatio);
       const proportion = Number(value) / Number(reserve.tokenReserve);
       const lpTokenAmount = proportion * Number(lpToken.totalSupply);
@@ -82,19 +86,33 @@ export function LiquidityActions({
       const depositRequest = {
         token: token,
         tokenAmount: parseEther(tokenAmount).toString(),
-        ethAmount: parseEther(ethAmount).toString(),
+        ethAmount: parseEther(Number(ethAmount).toFixed(13)).toString(),
       };
       const depositResult = await contractClient.deposit(depositRequest);
       if (!depositResult.success) {
         throw new Error(depositResult.error || "Deposit failed");
       }
-      toast.success(`Deposit Successful! Tx Hash: ${depositResult.txHash}`);
+      toast.success(
+        <div>
+          <div>Deposit Successful! </div>
+          <div>
+            <a
+              href={`${baseUrl}/tx/${depositResult.txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline text-blue-400"
+            >
+              View on block explorer
+            </a>
+          </div>
+        </div>
+      );
       setTokenAmount("");
       setEthAmount("");
       setLpAmount("");
       setShowPreview(false);
     } catch (error) {
-      toast.error(`Error: ${error || 'Failed to process liquidity operation'}`);
+      toast.error(`Error: ${error || "Failed to process liquidity operation"}`);
     } finally {
       setLoading(false);
     }
@@ -112,14 +130,28 @@ export function LiquidityActions({
       if (!withdrawResult.success) {
         throw new Error(withdrawResult.error || "Deposit failed");
       }
-      toast.success(`Withdraw Successful! Tx Hash: ${withdrawResult.txHash}`);
+      toast.success(
+        <div>
+          <div>Deposit Successful! </div>
+          <div>
+            <a
+              href={`${baseUrl}/tx/${withdrawResult.txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline text-blue-400"
+            >
+              View on block explorer
+            </a>
+          </div>
+        </div>
+      );
       // Reset form after successful transaction
       setTokenAmount("");
       setEthAmount("");
       setLpAmount("");
       setShowPreview(false);
     } catch (error) {
-      toast.error(`Error: ${error || 'Failed to process liquidity operation'}`);
+      toast.error(`Error: ${error || "Failed to process liquidity operation"}`);
       console.error(error);
     } finally {
       setLoading(false);
@@ -140,7 +172,11 @@ export function LiquidityActions({
       <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.08] to-primary-500/[0.05]" />
       <div className="absolute inset-0 border border-white/[0.05] rounded-lg bg-gradient-to-b from-white/[0.05] to-transparent" />
       <CardContent className="relative w-full">
-        <Tabs defaultValue="add" onValueChange={(value) => setCurrentTab(value as "add" | "remove")} className="w-full">
+        <Tabs
+          defaultValue="add"
+          onValueChange={(value) => setCurrentTab(value as "add" | "remove")}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-2 mb-4 bg-black/20 p-1 rounded-2xl backdrop-blur-md border border-white/[0.05]">
             <TabsTrigger
               value="add"
@@ -231,9 +267,9 @@ export function LiquidityActions({
                 parseFloat(lpAmount) > 0) && (
                 <div className="text-center space-y-1 pt-2">
                   <div className="text-sm text-foreground/60">
-                    1 {token.symbol} = {(1 / poolRatio)} ETH
-                    <span className="mx-2">•</span>1 ETH ={" "}
-                    {(poolRatio)} {token.symbol}
+                    1 {token.symbol} = {1 / poolRatio} ETH
+                    <span className="mx-2">•</span>1 ETH = {poolRatio}{" "}
+                    {token.symbol}
                   </div>
                 </div>
               )}
@@ -274,10 +310,9 @@ export function LiquidityActions({
 
                 {lpAmount && parseFloat(lpAmount) > 0 && (
                   <div className="mt-3 text-xs text-foreground/60 text-center">
-                    {(
-                      (Number(lpAmount) / Number(formatEther(BigInt(lpToken.totalSupply)))) *
-                      100
-                    )}
+                    {(Number(lpAmount) /
+                      Number(formatEther(BigInt(lpToken.totalSupply)))) *
+                      100}
                     % of pool
                   </div>
                 )}
@@ -345,7 +380,8 @@ export function LiquidityActions({
 
                 <div className="mt-3 text-xs text-foreground/60 text-center">
                   {(
-                    (Number(lpAmount) / Number(formatEther(BigInt(lpToken.totalSupply)))) *
+                    (Number(lpAmount) /
+                      Number(formatEther(BigInt(lpToken.totalSupply)))) *
                     100
                   ).toFixed(3)}
                   % of pool
@@ -414,9 +450,9 @@ export function LiquidityActions({
               {parseFloat(lpAmount) > 0 && (
                 <div className="text-center space-y-1 pt-2">
                   <div className="text-sm text-foreground/60">
-                   1 {token.symbol} = {(1 / poolRatio)} ETH
-                    <span className="mx-2">•</span>1 ETH ={" "}
-                    {(poolRatio)} {token.symbol}
+                    1 {token.symbol} = {1 / poolRatio} ETH
+                    <span className="mx-2">•</span>1 ETH = {poolRatio}{" "}
+                    {token.symbol}
                   </div>
                 </div>
               )}

@@ -50,11 +50,13 @@ export interface SwapRequest{
 export interface SellRequest{
   token: Token,
   amountIn: string,
+  minimumEthAmount: string
 }
 
 export interface BuyRequest{
   token: Token,
   amountIn: string
+  minimumAmountToBuy: string
 }
 
 export interface DepositRequest{
