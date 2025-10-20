@@ -33,7 +33,7 @@ interface ChartDataPoint {
   timestamp: number;
 }
 
-const BLOCKS_PER_FETCH = 5000; // Load 1000 blocks at a time
+const BLOCKS_PER_FETCH = 999; // Load 1000 blocks at a time
 
 export function PriceCharts({ token, pool }: PriceChartsProps) {
   const { writeContractAsync } = useWriteContract();
@@ -128,6 +128,8 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
         contractClient.getBuyTradeEventLogs(fromBlock, toBlock, token),
         contractClient.getSellTradeEventLogs(fromBlock, toBlock, token),
       ]);
+
+      console.log("Fetched trades from blocks", fromBlock, "to", toBlock);
 
       // Generate chart data from trades
       const newChartData = generateChartData(buyTrades, sellTrades);
@@ -256,7 +258,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
                   Buy Price
                 </h4>
                 <p className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-500">
-                  {currentBuyPrice.toFixed(6)} ETH
+                  {currentBuyPrice} ETH
                 </p>
                 <div className="flex items-center mt-1 text-xs text-muted-foreground">
                   {chartData.length > 0
@@ -309,7 +311,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
                       tick={{ fill: "rgb(148, 163, 184)", fontSize: 12 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) => `${value.toFixed(6)}`}
+                      tickFormatter={(value) => `${value}`}
                     />
                     <Tooltip
                       contentStyle={{
@@ -353,7 +355,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
                   Sell Price
                 </h4>
                 <p className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-red-500">
-                  {currentSellPrice.toFixed(6)} ETH
+                  {currentSellPrice} ETH
                 </p>
                 <div className="flex items-center mt-1 text-xs text-muted-foreground">
                   {chartData.length > 0
@@ -406,7 +408,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
                       tick={{ fill: "rgb(148, 163, 184)", fontSize: 12 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) => `${value.toFixed(6)}`}
+                      tickFormatter={(value) => `${value}`}
                     />
                     <Tooltip
                       contentStyle={{
@@ -418,7 +420,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
                       labelStyle={{ color: "rgb(148, 163, 184)" }}
                       labelFormatter={(label) => label}
                       formatter={(value: number) => [
-                        `${value.toFixed(6)} ETH`,
+                        `${value} ETH`,
                         "Sell Price",
                       ]}
                     />
@@ -471,7 +473,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
                   {(
                     chartData.reduce((sum, point) => sum + point.buyPrice, 0) /
                     chartData.length
-                  ).toFixed(6)}{" "}
+                  )}{" "}
                   ETH
                 </div>
               </div>
@@ -484,7 +486,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
                   {(
                     chartData.reduce((sum, point) => sum + point.sellPrice, 0) /
                     chartData.length
-                  ).toFixed(6)}{" "}
+                  )}{" "}
                   ETH
                 </div>
               </div>

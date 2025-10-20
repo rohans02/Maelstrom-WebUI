@@ -51,7 +51,7 @@ export const CONTRACT_ADDRESSES: Record<number, Address> = {
     137: "0x897CeF988A12AB77A12fd8f2Ca74F0B978d302CF" as Address, // Polygon
     56: "0x897CeF988A12AB77A12fd8f2Ca74F0B978d302CF" as Address, // BSC
     8453: "0x897CeF988A12AB77A12fd8f2Ca74F0B978d302CF" as Address, // BASE
-    5115: "0x76A5ef90eac5dd9B99F87470935c8bcDE7dd02B4" as Address, // Citera Testnet
+    5115: "0x7B1E47C3C6b1eea13D06566f078DcBaEF5B63Ee5" as Address, // Citera Testnet
 
 }
 

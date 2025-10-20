@@ -119,8 +119,8 @@ export function SellForm({
 
     const sellRequest: SellRequest = {
       token: token,
-      amountIn: parseEther(tokenAmount).toString(),
-      minimumEthAmount: parseEther(minimumEthOut).toString(),
+      amountIn: (Math.round(Number(tokenAmount) * 1e18)).toString(),
+      minimumEthAmount: (Math.round(Number(minimumEthOut) * 1e18)).toString(),
     };
 
     const result: SellResult = await contractClient.sell(sellRequest);
@@ -297,7 +297,7 @@ export function SellForm({
         </div>
       </div>
 
-      {token && tokenAmount && !isFetchingRates && !isSwapping && (
+      {token && Number(tokenAmount) > 0 && !isFetchingRates && !isSwapping && (
         <div className="mt-5 space-y-3 p-4 bg-white/[0.02] border border-white/[0.05] rounded-xl backdrop-blur-sm">
           <div className="flex items-center justify-between text-sm">
             <span className="text-white/50 font-medium">Rate</span>
@@ -307,7 +307,7 @@ export function SellForm({
             </span>
           </div>
           {/* Slippage Tolerance - Only show in Advanced Mode */}
-          {!zeroSlippageMode && (
+          {!zeroSlippageMode ? (
             <div className="space-y-3 pt-2 border-t border-white/[0.05]">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-white/50 font-medium flex items-center gap-2">
@@ -367,7 +367,7 @@ export function SellForm({
                 </div>
               )}
             </div>
-          )}
+          ) : null}
         </div>
       )}
 

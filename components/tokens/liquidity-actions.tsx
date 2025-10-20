@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { LiquidityPoolToken, Token } from "@/types/token";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ContractClient } from "@/lib/contract-client";
-import { CONTRACT_ADDRESS } from "@/types/contract";
 import { Reserve } from "@/types/pool";
 import { formatEther, parseEther } from "viem";
 
@@ -45,6 +44,9 @@ export function LiquidityActions({
   const handleTokenAmountChange = useCallback(
     (value: string) => {
       setTokenAmount(value);
+      console.log(poolRatio)
+      console.log(value)
+      console.log(Number(value) / Number(poolRatio))
       const ethAmount = Number(value) / Number(poolRatio);
       const proportion = Number(value) / Number(reserve.tokenReserve);
       const lpTokenAmount = proportion * Number(lpToken.totalSupply);
@@ -84,7 +86,7 @@ export function LiquidityActions({
       const depositRequest = {
         token: token,
         tokenAmount: parseEther(tokenAmount).toString(),
-        ethAmount: parseEther(ethAmount).toString(),
+        ethAmount: parseEther(Number(ethAmount).toFixed(13)).toString(),
       };
       const depositResult = await contractClient.deposit(depositRequest);
       if (!depositResult.success) {

@@ -11,7 +11,6 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { ArrowDownUp, Settings, Shield, HelpCircle } from "lucide-react";
 import { ContractClient } from "@/lib/contract-client";
-import { CONTRACT_ADDRESS } from "@/types/contract";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { Token } from "@/types/token";
 import { BuyRequest, SellRequest, SwapRequest } from "@/types/trades";
@@ -23,6 +22,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { max } from "lodash";
 
 interface SwapState {
   tokenIn: Token | undefined;
@@ -70,6 +70,7 @@ export function SwapInterface() {
   const [zeroSlippageMode, setZeroSlippageMode] = useState<boolean>(true); // Default to zero slippage mode
 
   const calculateOutput = (amount: string, isInput: boolean) => {
+    setValidationError("");
     if (!amount || !tokenInSellPrice || !tokenOutBuyPrice) return "";
 
     const amountNum = Number(amount);
@@ -84,6 +85,7 @@ export function SwapInterface() {
         const maxEthAllowed = Number(ethInReserve) * 0.1;
         if (ethAmount > maxEthAllowed) {
           const maxTokenIn = maxEthAllowed / tokenInSellPrice;
+          console.log(maxTokenIn);
           setValidationError(
             `Amount exceeds 10% of reserve. Maximum: ${maxTokenIn.toFixed(6)} ${
               swapState.tokenIn?.symbol || ""
@@ -96,16 +98,16 @@ export function SwapInterface() {
       const output = ethAmount / tokenOutBuyPrice;
 
       if (tokenOutReserve) {
-        console.log("checking!");
         // Ensure we don't exceed the tokenOut reserve by more than 10%
         const maxTokenOutAllowed = Number(tokenOutReserve) * 0.1;
         if (output * 1e18 > maxTokenOutAllowed) {
-          const maxInput =
-            (maxTokenOutAllowed * tokenOutBuyPrice) / tokenInSellPrice;
+          const maxInput = Math.round(
+            (maxTokenOutAllowed * tokenOutBuyPrice) / tokenInSellPrice
+          );
           setValidationError(
-            `Output exceeds 10% of reserve. Maximum input: ${maxInput.toFixed(
-              6
-            )} ${swapState.tokenIn?.symbol || ""}`
+            `Output exceeds 10% of reserve. Maximum input: ${formatEther(
+              BigInt(maxInput)
+            )} ${swapState.tokenOut?.symbol || ""}`
           );
           return "";
         }
@@ -305,8 +307,8 @@ export function SwapInterface() {
       if (swapState.tokenIn.symbol == "ETH") {
         const buyRequest: BuyRequest = {
           token: swapState.tokenOut,
-          amountIn: parseEther(swapState.amountIn).toString(),
-          minimumAmountToBuy: parseEther(minimumTokenOut).toString(),
+          amountIn: (Math.round(Number(swapState.amountIn) * 1e18 )).toString(),
+          minimumAmountToBuy: (Math.round(Number(minimumTokenOut) * 1e18)).toString(),
         };
         const result = await contractClient.buy(buyRequest);
         if (result.success) {
@@ -338,8 +340,8 @@ export function SwapInterface() {
       if (swapState.tokenOut.symbol == "ETH") {
         const sellRequest: SellRequest = {
           token: swapState.tokenIn,
-          amountIn: parseEther(swapState.amountIn).toString(),
-          minimumEthAmount: parseEther(minimumTokenOut).toString(),
+          amountIn: (Math.round(Number(swapState.amountIn) * 1e18 )).toString(),
+          minimumEthAmount: (Math.round(Number(minimumTokenOut) * 1e18)).toString(),
         };
         const result = await contractClient.sell(sellRequest);
         if (result.success) {
@@ -372,8 +374,8 @@ export function SwapInterface() {
     const swapRequest: SwapRequest = {
       tokenIn: swapState.tokenIn,
       tokenOut: swapState.tokenOut,
-      amountIn: parseEther(swapState.amountIn).toString(),
-      minimumTokenOut: parseEther(minimumTokenOut).toString(),
+      amountIn: (Math.round(Number(swapState.amountIn) * 1e18 )).toString(),
+      minimumTokenOut: (Math.round(Number(minimumTokenOut) * 1e18)).toString(),
     };
     const result = await contractClient.swap(swapRequest);
     if (result.success) {

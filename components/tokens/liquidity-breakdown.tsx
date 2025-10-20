@@ -9,7 +9,7 @@ interface LiquidityBreakdownProps {
 }
 
 export function LiquidityBreakdown({ poolData }: LiquidityBreakdownProps) {
-  const APR = poolData.apr;
+  const APR = (poolData.apr).toFixed(2) + "%";
   const symbol = poolData.token.symbol;
   const avgPrice = (Number(poolData.avgPrice) / 1e18).toFixed(8).replace(/\.?0+$/, '');
   const tokenReserve = Number(formatEther(BigInt(poolData.reserve.tokenReserve))).toFixed(8).replace(/\.?0+$/, '');
@@ -19,6 +19,7 @@ export function LiquidityBreakdown({ poolData }: LiquidityBreakdownProps) {
   const ethReserveValue = Number((Number(ethReserve) * ethPrice).toFixed(8)).toString().replace(/\.?0+$/, '');
   const tokenPercentage = Number((Number(tokenReserveValue) / (Number(tokenReserveValue) + Number(ethReserveValue)) * 100).toFixed(2));
   const ethPercentage = 100 - tokenPercentage;
+  const currentSpread = (Number(poolData.buyPrice) - Number(poolData.sellPrice)) / Number(poolData.avgPrice) * 100;
   return (
     <Card className="relative overflow-hidden border-0 h-full flex flex-col">
       {/* Enhanced glass background */}
@@ -52,11 +53,11 @@ export function LiquidityBreakdown({ poolData }: LiquidityBreakdownProps) {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 shadow-sm shadow-blue-500/20"></div>
                 <span className="text-cyan-400 text-sm font-medium">
-                  Trading Fee
+                  Current Spread
                 </span>
               </div>
               <span className="text-lg font-bold text-white">
-                {/*Hardcoded for now*/} {"5%"}
+                {currentSpread.toFixed(2)}%
               </span>
             </div>
           </div>

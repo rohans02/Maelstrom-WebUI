@@ -1,6 +1,5 @@
 "use client";
 
-import { formatRelativeTime } from "@/types/pool";
 import { Deposit, Withdraw } from "@/types/trades";
 import { useEffect, useState } from "react";
 import { formatEther } from "viem";
@@ -94,7 +93,7 @@ export function RecentActivity({ events }: RecentActivityProps) {
                       {activity.type}
                     </p>
                     <span className="text-xs text-muted-foreground/60">
-                      {formatRelativeTime(activity.timestamp)}
+                      {new Date(activity.timestamp).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-1">

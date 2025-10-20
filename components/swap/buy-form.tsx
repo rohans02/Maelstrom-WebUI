@@ -102,6 +102,7 @@ export function BuyForm({
       }
       setTokenAmount(tokenValue);
     }
+    setValidationError("");
   };
 
   const handleSwapInputType = () => {
@@ -127,8 +128,8 @@ export function BuyForm({
 
     const request: BuyRequest = {
       token,
-      amountIn: parseEther(ethAmount).toString(),
-      minimumAmountToBuy: parseEther(minimumTokenOut).toString(),
+      amountIn: (Math.round(Number(ethAmount) * 1e18)).toString(),
+      minimumAmountToBuy: (Math.round(Number(minimumTokenOut) * 1e18)).toString(),
     };
     const result: BuyResult = await contractClient.buy(request);
     if (result.success) {
@@ -280,7 +281,7 @@ export function BuyForm({
         </div>
       </div>
 
-      {token && tokenAmount && !isFetchingRates && !isSwapping && (
+      {token && Number(tokenAmount) > 0 && !isFetchingRates && !isSwapping && (
         <div className="mt-5 space-y-3 p-4 bg-white/[0.02] border border-white/[0.05] rounded-xl backdrop-blur-sm">
           <div className="flex items-center justify-between text-sm">
             <span className="text-white/50 font-medium">Rate</span>
@@ -290,7 +291,7 @@ export function BuyForm({
             </span>
           </div>
           {/* Slippage Tolerance - Only show in Advanced Mode */}
-          {!zeroSlippageMode && (
+          {!zeroSlippageMode ? (
             <div className="space-y-3 pt-2 border-t border-white/[0.05]">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-white/50 font-medium flex items-center gap-2">
@@ -350,7 +351,7 @@ export function BuyForm({
                 </div>
               )}
             </div>
-          )}
+          ) : null}
         </div>
       )}
 

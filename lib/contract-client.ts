@@ -13,7 +13,6 @@ export class ContractClient implements IContractClient {
 
     constructor(writeContract: WriteContractMutateAsync<Config, unknown>, publicClient: UsePublicClientReturnType, chainId?: number) {
         this.contractAddress = chainId ? CONTRACT_ADDRESSES[chainId] : CONTRACT_ADDRESSES[63];
-        console.log("Initializing ContractClient for chainId:",this.contractAddress);
         this.writeContract = writeContract;
         this.publicClient = publicClient;
     }
@@ -332,7 +331,7 @@ export class ContractClient implements IContractClient {
     }
 
     private getAPR(poolYield: string): string {
-        return (Number(poolYield) * 365 * 24 * 60 * 60 * 100).toString();//Custom 3% trade fee
+        return (Number(poolYield) * 365  * 100).toString();
     }
 
     private async getBlockTimestamp(blockNumber: bigint): Promise<number> {
@@ -540,14 +539,14 @@ export class ContractClient implements IContractClient {
     private async get24hBeforeBlock(): Promise<bigint> {
         try {
             let lowBlock = BigInt(0);
-            let highBlock = BigInt(0);
+            let highBlock = await this.publicClient?.getBlockNumber() as bigint;
             while (lowBlock <= highBlock) {
-                const midBlock = (lowBlock + highBlock) / BigInt(2);
-                const midTimestamp = await this.getBlockTimestamp(midBlock);
+                const midBlock = Math.round(Number(lowBlock + highBlock) / 2);
+                const midTimestamp = await this.getBlockTimestamp(BigInt(midBlock));
                 if (Date.now() - midTimestamp < 24 * 60 * 60 * 1000) {
-                    lowBlock = midBlock + BigInt(1);
+                    highBlock = BigInt(midBlock) - BigInt(1);
                 } else {
-                    highBlock = midBlock - BigInt(1);
+                    lowBlock = BigInt(midBlock) + BigInt(1);
                 }
             }
             return lowBlock;
@@ -560,9 +559,29 @@ export class ContractClient implements IContractClient {
         try {
             const toBlock = await this.publicClient?.getBlockNumber();
             const fromBlock = await this.get24hBeforeBlock();
-            const buyLogs = await this.getBuyTradeEventLogs(Number(fromBlock), Number(toBlock), token);
-            const sellLogs = await this.getSellTradeEventLogs(Number(fromBlock), Number(toBlock), token);
-            const swapLogs = await this.getSwapTradeEventLogs(Number(fromBlock), Number(toBlock), token);
+            const BLOCK_BATCH_SIZE = 999;
+            let currentBlock = Number(fromBlock);
+            const targetBlock = Number(toBlock);
+
+            let buyLogs: BuyTrade[] = [];
+            let sellLogs: SellTrade[] = [];
+            let swapLogs: SwapTrade[] = [];
+
+            while (currentBlock < targetBlock) {
+                const batchEndBlock = Math.min(currentBlock + BLOCK_BATCH_SIZE, targetBlock);
+
+                const [batchBuyLogs, batchSellLogs, batchSwapLogs] = await Promise.all([
+                    this.getBuyTradeEventLogs(currentBlock, batchEndBlock, token),
+                    this.getSellTradeEventLogs(currentBlock, batchEndBlock, token),
+                    this.getSwapTradeEventLogs(currentBlock, batchEndBlock, token)
+                ]);
+
+                buyLogs = buyLogs.concat(batchBuyLogs);
+                sellLogs = sellLogs.concat(batchSellLogs);
+                swapLogs = swapLogs.concat(batchSwapLogs);
+
+                currentBlock = batchEndBlock + 1;
+            }
             let volume = 0;
             buyLogs.forEach(log => {
                 volume += Number(log.ethAmount);
@@ -694,8 +713,8 @@ export class ContractClient implements IContractClient {
             const avgPrice = this.getAvgPrice(buyPrice, sellPrice);
             const totalLiquidity = this.getTotalLiquidity(avgPrice, reserve);
             const feeEventsCount = await this.getPoolFeeEventsCount(token);
-            const poolFeesEvents = await this.getPoolFeeEvents(token, Math.max(feeEventsCount - 10, 0), feeEventsCount-1);
-            const poolYield = this.getYield(poolFeesEvents, totalLiquidity);
+            const poolFeesEvents = feeEventsCount > 0 ? await this.getPoolFeeEvents(token, Math.max(feeEventsCount - 10, 0), feeEventsCount - 1) : 0;
+            const poolYield = feeEventsCount > 0 ? this.getYield(poolFeesEvents as PoolFeesEvent[], totalLiquidity) : 0;
             const apr = this.getAPR(String(poolYield));
             const lastExchangeTs = await this.getLastExchangeTimestamp(token);
 
@@ -885,10 +904,11 @@ export class ContractClient implements IContractClient {
                 args: [token.address, BigInt(startIndex), BigInt(endIndex)]
             });
             let result: PoolFeesEvent[] = [];
-            for (let i = 0; i < (data as any[]).length; i++) {
+            if(!data) throw new Error("No data returned from readContract");
+            for (let i = 0; i < (data).length; i++) {
                 result.push({
-                    timestamp: Number((data as any[])[i][1]) * 1000,
-                    fee: (data as any[])[i][0].toString(),
+                    timestamp: Number(data[i].timestamp) * 1000,
+                    fee: (data[i].fee).toString(),
                 });
             }
             return result;
@@ -902,7 +922,7 @@ export class ContractClient implements IContractClient {
         feeEvents.forEach(event => {
             totalFees += Number(event.fee);
         });
-        const totalTime = (feeEvents[feeEvents.length - 1].timestamp - feeEvents[0].timestamp) / (1000 * 60 * 60 * 24); //days
+        const totalTime = (feeEvents[feeEvents.length - 1].timestamp - feeEvents[0].timestamp) / (60 * 60 * 24); //days
         return totalFees / (totalTime * Number(totalLiquidity));
     }
 }

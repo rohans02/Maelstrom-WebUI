@@ -9,7 +9,6 @@ import { TokenPageSkeleton } from "@/components/tokens/token-page-skeleton";
 import { CSSProperties, useEffect, useMemo, useState } from "react";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ContractClient } from "@/lib/contract-client";
-import { CONTRACT_ADDRESS } from "@/types/contract";
 import { Pool } from "@/types/pool";
 import { Address } from "viem";
 import { Token } from "@/types/token";

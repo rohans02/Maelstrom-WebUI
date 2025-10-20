@@ -6,7 +6,6 @@ import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ContractClient } from "@/lib/contract-client";
-import { CONTRACT_ADDRESS } from "@/types/contract";
 import { useEffect, useMemo, useState } from "react";
 import { RowPool } from "@/types/pool";
 import { toast } from "sonner";
@@ -73,7 +72,7 @@ export default function DashboardPage() {
       const currentBlock = await publicClient?.getBlock();
       if (!currentBlock) return;
       const deposits = await contractClient.getDepositEventLogs(
-        Number(currentBlock.number) - 1000,
+        Number(currentBlock.number) - 999,
         Number(currentBlock.number),
         undefined,
         address
@@ -91,7 +90,7 @@ export default function DashboardPage() {
       const currentBlock = await publicClient?.getBlock();
       if (!currentBlock) return;
       const withdrawals = await contractClient.getWithdrawEventLogs(
-        Number(currentBlock.number) - 1000,
+        Number(currentBlock.number) - 999,
         Number(currentBlock.number),
         undefined,
         address
@@ -135,10 +134,6 @@ export default function DashboardPage() {
         if (count === undefined) throw new Error("Pool count is undefined");
         
         await fetchUserPools(count);
-        // const liquidity = await contractClient.getUserLiquidity(address);
-        // const liquidityFormatted = formatEther(BigInt(liquidity));
-        // setTotalLiquidity(liquidityFormatted);
-        
         await fetchRecentDeposits();
         await fetchRecentWithdrawals();
         
@@ -153,15 +148,12 @@ export default function DashboardPage() {
     fetchData();
   }, [address]);
 
-  // Separate effect to calculate values when pools or liquidity changes
-  // useEffect(() => {
-  //   if (pools.length > 0 && totalLiquidity !== "0") {
-  //     const portfolio = calculatePortfolioValue(pools);
-  //     setPortfolioValue(portfolio);
-  //     const profit = calculateProfit(portfolio, totalLiquidity);
-  //     setTotalProfit(profit);
-  //   }
-  // }, [pools, totalLiquidity]);
+  useEffect(() => {
+    if (pools.length > 0) {
+      const portfolio = calculatePortfolioValue(pools);
+      setPortfolioValue(portfolio);
+    }
+  }, [pools]);
 
   if (isLoading) {
     return <DashboardSkeleton />;
