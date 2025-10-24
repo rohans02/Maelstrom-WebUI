@@ -17,21 +17,22 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { parseEther, isAddress, Address } from "viem";
 import { Loader2, Plus } from "lucide-react";
+import { TokenPicker, TokenObject } from "@/components/tokens/token-picker";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function CreatePoolPage() {
-  const {chainId} = useAccount();
+  const { chainId } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const contractClient = useMemo(
-    () => new ContractClient(
-      writeContractAsync,
-      publicClient,
-      chainId
-    ),
+    () => new ContractClient(writeContractAsync, publicClient, chainId),
     [chainId]
   );
   const { chain, isConnected } = useAccount();
   const baseUrl = chain?.blockExplorers?.default.url;
+  const [tokenName, setTokenName] = useState("");
+  const [tokenSymbol, setTokenSymbol] = useState("");
+  const [tokenURL, setTokenURL] = useState("");
 
   const [formData, setFormData] = useState<InitPool>({
     token: "",
@@ -154,7 +155,7 @@ export default function CreatePoolPage() {
         inititalBuyPrice: buyPriceWei,
         initialSellPrice: sellPriceWei,
       };
-      
+
       const result = await contractClient.initializePool(initPoolData);
 
       if (result.success) {
@@ -245,16 +246,58 @@ export default function CreatePoolPage() {
                     Token Contract Address
                   </Label>
                   <div className="relative">
-                    <Input
-                      id="token"
-                      placeholder="0x..."
-                      value={formData.token}
-                      onChange={(e) => handleTokenAddressChange(e.target.value)}
-                      className="pr-10"
-                    />
-                    {isValidatingToken && (
-                      <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
+                    <Tabs defaultValue="picker" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2 mb-4">
+                        <TabsTrigger
+                          value="picker"
+                          className="hover:bg-muted data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black"
+                        >
+                          Select Token
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="manual"
+                          className="hover:bg-muted data-[state=active]:bg-black dark:data-[state=active]:bg-white data-[state=active]:text-white dark:data-[state=active]:text-black"
+                        >
+                          Enter Token Contract Address
+                        </TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="picker" className="mt-0">
+                        <TokenPicker
+                          selected={
+                            formData.token
+                              ? {
+                                  contract_address: formData.token,
+                                  symbol: tokenSymbol,
+                                  name: tokenName,
+                                  image: tokenURL,
+                                }
+                              : null
+                          }
+                          onSelect={(token: TokenObject) => {
+                            handleTokenAddressChange(token.contract_address);
+                            setTokenName(token.name);
+                            setTokenSymbol(token.symbol);
+                            setTokenURL(token.image);
+                          }}
+                          chainId={chainId ? chainId : 63}
+                          className="w-full"
+                        />
+                      </TabsContent>
+                      <TabsContent value="manual" className="mt-0">
+                        <Input
+                          id="token"
+                          placeholder="0x..."
+                          value={formData.token}
+                          onChange={(e) =>
+                            handleTokenAddressChange(e.target.value)
+                          }
+                          className="pr-10"
+                        />
+                        {isValidatingToken && (
+                          <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </TabsContent>
+                    </Tabs>
                   </div>
                   {tokenInfo && (
                     <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
