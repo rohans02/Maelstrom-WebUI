@@ -45,10 +45,18 @@ export function HeroSection() {
           weight: "700",
         },
         {
-          text: "Automated Market Making with Proper Price Discovery",
+          text: "Automated Market Making",
           size: 28,
           x: window.innerWidth / 2,
           y: centerY + 120, // Adjusted position
+          font: "Plus Jakarta Sans, sans-serif",
+          weight: "500",
+        },
+        {
+          text: "with Proper Price Discovery",
+          size: 28,
+          x: window.innerWidth / 2,
+          y: centerY + 160, // Adjusted position
           font: "Plus Jakarta Sans, sans-serif",
           weight: "500",
         },
@@ -82,13 +90,13 @@ export function HeroSection() {
       {/* Visible Content */}
       <div className="relative container mx-auto px-4 text-center z-30">
         <div className="max-w-4xl mx-auto">
-          {/* Animated Circular Text - Positioned above */}
-          <div className="absolute top-[-50px] left-1/2 transform -translate-x-1/2">
+          {/* Animated Circular Text - Positioned to encompass all content */}
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
             <CircularText
-              text="MAELSTROM*EXCHANGE*"
+              text="MAELSTROM*MAELSTROM*"
               onHover="speedUp"
-              spinDuration={20}
-              className="custom-class"
+              spinDuration={60}
+              className="hero-circular-text"
             />
           </div>
 

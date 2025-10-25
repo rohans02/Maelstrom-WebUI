@@ -415,18 +415,14 @@ export default function CreatePoolPage() {
                   {lessETHValue && (
                     <div className="p-3 w-full rounded-lg bg-primary/10 border border-primary/20">
                       <p className="text-sm text-white">
-                        ⚠️ The provided {nativeCurrencySymbol} amount is
-                        significantly lower than the implied value based on
-                        token amount and prices.
+                        ⚠️The provided {nativeCurrencySymbol} amount is very low compared to the amount of token provided. Based on the initial price configuration, these amounts would result in an initially unbalance pool with only 25% of its value in {nativeCurrencySymbol} and 75% in token. We recommend increasing the initial {nativeCurrencySymbol} amount or reducing the initial token amount, or checking whether the initial price configuration is correct.
                       </p>
                     </div>
                   )}
                   {moreETHValue && (
                     <div className="p-3 w-full rounded-lg bg-primary/10 border border-primary/20">
                       <p className="text-sm text-white">
-                        ⚠️ The provided {nativeCurrencySymbol} amount is
-                        significantly greater than the implied value based on
-                        token amount and prices.
+                        ⚠️The provided {nativeCurrencySymbol} amount is very large compared to the amount of token provided. Based on the initial price configuration, these amounts would result in an initially unbalance pool with only 25% of its value in token and 75% in {nativeCurrencySymbol}. We recommend reducing the initial {nativeCurrencySymbol} amount or increasing the initial token amount, or checking whether the initial price configuration is correct.
                       </p>
                     </div>
                   )}
