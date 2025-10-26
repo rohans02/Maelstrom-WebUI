@@ -1,4 +1,5 @@
 import { Address } from "viem"
+import { type Chain } from "viem"
 
 export interface Token{
   address: Address
@@ -17,4 +18,18 @@ export const ETH: Token = {
   symbol: "ETH",
   name: "Ether",
   decimals: 18,
+}
+
+// Helper function to get native currency token based on chain
+export function getNativeCurrencyToken(chain?: Chain): Token {
+  if (!chain) {
+    return ETH;
+  }
+  
+  return {
+    address: "0x0000000000000000000000000000000000000000",
+    symbol: chain.nativeCurrency.symbol,
+    name: chain.nativeCurrency.name,
+    decimals: chain.nativeCurrency.decimals,
+  };
 }

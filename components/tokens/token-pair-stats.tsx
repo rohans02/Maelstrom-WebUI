@@ -3,28 +3,32 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Pool } from "@/types/pool";
 import { formatEther } from "viem";
+import { useAccount } from "wagmi";
 
 interface TokenPairStatsProps {
   poolData: Pool;
 }
 
 export function TokenPairStats({ poolData }: TokenPairStatsProps) {
+  const { chain } = useAccount();
+  const nativeCurrencySymbol = chain?.nativeCurrency?.symbol || "ETH";
+  
   const stats = [
     {
       label: "24h Volume",
-      value: `${Number(formatEther(BigInt(poolData.volume24h))).toFixed(8)} ETH`,
+      value: `${Number(formatEther(BigInt(poolData.volume24h))).toFixed(8)} ${nativeCurrencySymbol}`,
     },
     {
       label: "Total Liquidity",
-      value: `${Number(formatEther(BigInt(poolData.totalLiquidty))).toFixed(8)} ETH`,
+      value: `${Number(formatEther(BigInt(poolData.totalLiquidty))).toFixed(8)} ${nativeCurrencySymbol}`,
     },
     {
       label: "Buy Price",
-      value: `${Number(formatEther(BigInt(poolData.buyPrice))).toFixed(8)} ETH`,
+      value: `${Number(formatEther(BigInt(poolData.buyPrice))).toFixed(8)} ${nativeCurrencySymbol}`,
     },
     {
       label: "Sell Price",
-      value: `${Number(formatEther(BigInt(poolData.sellPrice))).toFixed(8)} ETH`,
+      value: `${Number(formatEther(BigInt(poolData.sellPrice))).toFixed(8)} ${nativeCurrencySymbol}`,
       change: "Current",
       positive: true,
     },

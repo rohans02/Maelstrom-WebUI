@@ -3,6 +3,8 @@ import { LiquidityPoolToken, Token } from "./token"
 export interface BuyTrade{
   token: Token
   buyPrice: string
+  updatedBuyPrice: string
+  sellPrice: string
   ethAmount: string
   timestamp: number
 }
@@ -10,6 +12,8 @@ export interface BuyTrade{
 export interface SellTrade{
   token: Token
   sellPrice: string
+  updatedSellPrice: string
+  buyPrice: string
   ethAmount: string
   timestamp: number
 }
@@ -21,6 +25,8 @@ export interface SwapTrade{
     amountOut: string
     sellPrice: string
     buyPrice: string
+    updatedSellPrice: string
+    updatedBuyPrice: string
     timestamp: number
 }
 

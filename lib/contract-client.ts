@@ -30,6 +30,18 @@ export class ContractClient implements IContractClient {
         }
     }
 
+    async isPoolInstantiated(token: Address): Promise<boolean> {
+        const data = await this.publicClient?.readContract({
+            address: this.contractAddress,
+            abi: ABI,
+            functionName: 'poolToken',
+            args: [token]
+        });
+        console.log("isPoolInstantiated data:", data);
+        if (data && data === "0x0000000000000000000000000000000000000000") return false;
+        return true;
+    }
+
     async initializePool(initPool: InitPool): Promise<InitPoolResult> {
         try {
             const result: InitPoolResult = {
@@ -43,7 +55,7 @@ export class ContractClient implements IContractClient {
                 address: this.contractAddress,
                 abi: ABI,
                 functionName: 'initializePool',
-                args: [initPool.token as Address, BigInt(initPool.tokenAmount), BigInt(initPool.inititalBuyPrice), BigInt(initPool.initialSellPrice)],
+                args: [initPool.token as Address, BigInt(initPool.tokenAmount), BigInt(initPool.initialBuyPrice), BigInt(initPool.initialSellPrice)],
                 value: BigInt(initPool.ethAmount)
             });
             result.txHash = txHash;
@@ -331,7 +343,7 @@ export class ContractClient implements IContractClient {
     }
 
     private getAPR(poolYield: string): string {
-        return (Number(poolYield) * 365  * 100).toString();
+        return (Number(poolYield) * 365 * 100).toString();
     }
 
     private async getBlockTimestamp(blockNumber: bigint): Promise<number> {
@@ -349,7 +361,7 @@ export class ContractClient implements IContractClient {
                 address: this.contractAddress,
                 fromBlock: BigInt(fromBlock),
                 toBlock: BigInt(toBlock),
-                event: parseAbiItem('event BuyTrade(address indexed token, address indexed trader, uint256 ethAmount, uint256 tokenAmount, uint256 buyPrice)'),
+                event: parseAbiItem('event BuyTrade(address indexed token, address indexed trader, uint256 amountEther, uint256 amountToken, uint256 tradeBuyPrice, uint256 updatedBuyPrice, uint256 sellPrice)'),
                 args: {
                     token: (token?.address as Address),
                     trader: user as Address | undefined
@@ -366,16 +378,20 @@ export class ContractClient implements IContractClient {
                 )
                 result = (logs || []).map((log, index) => ({
                     token: tokens[index],
-                    buyPrice: log.args.buyPrice.toString(),
-                    ethAmount: log.args.ethAmount.toString(),
+                    buyPrice: log.args.tradeBuyPrice.toString(),
+                    updatedBuyPrice: log.args.updatedBuyPrice.toString(),
+                    ethAmount: log.args.amountEther.toString(),
+                    sellPrice: log.args.sellPrice.toString(),
                     timestamp: timestamps[index],
                 }));
                 return result;
             }
             result = (logs || []).map((log, index) => ({
                 token: token,
-                buyPrice: log.args.buyPrice.toString(),
-                ethAmount: log.args.ethAmount.toString(),
+                buyPrice: log.args.tradeBuyPrice.toString(),
+                updatedBuyPrice: log.args.updatedBuyPrice.toString(),
+                ethAmount: log.args.amountEther.toString(),
+                sellPrice: log.args.sellPrice.toString(),
                 timestamp: timestamps[index],
             }));
             return result;
@@ -390,7 +406,7 @@ export class ContractClient implements IContractClient {
                 address: this.contractAddress,
                 fromBlock: BigInt(fromBlock),
                 toBlock: BigInt(toBlock),
-                event: parseAbiItem('event SellTrade(address indexed token, address indexed trader, uint256 tokenAmount, uint256 ethAmount, uint256 sellPrice)'),
+                event: parseAbiItem('event SellTrade(address indexed token, address indexed trader, uint256 amountToken, uint256 amountEther, uint256 tradeSellPrice, uint256 updatedSellPrice, uint256 buyPrice)'),
                 args: {
                     token: (token?.address as Address),
                     trader: user as Address | undefined
@@ -407,17 +423,21 @@ export class ContractClient implements IContractClient {
                 )
                 result = (logs || []).map((log, index) => ({
                     token: tokens[index],
-                    sellPrice: log.args.sellPrice.toString(),
-                    ethAmount: log.args.ethAmount.toString(),
+                    sellPrice: log.args.tradeSellPrice.toString(),
+                    updatedSellPrice: log.args.updatedSellPrice.toString(),
+                    ethAmount: log.args.amountEther.toString(),
+                    buyPrice: log.args.buyPrice.toString(),
                     timestamp: timestamps[index],
                 }));
                 return result;
             }
             result = (logs || []).map((log, index) => ({
                 token: token,
-                sellPrice: log.args.sellPrice.toString(),
-                ethAmount: log.args.ethAmount.toString(),
+                sellPrice: log.args.tradeSellPrice.toString(),
+                updatedSellPrice: log.args.updatedSellPrice.toString(),
+                ethAmount: log.args.amountEther.toString(),
                 timestamp: timestamps[index],
+                buyPrice: log.args.buyPrice.toString(),
             }));
             return result;
         } catch (error) {
@@ -431,9 +451,9 @@ export class ContractClient implements IContractClient {
                 address: this.contractAddress,
                 fromBlock: BigInt(fromBlock),
                 toBlock: BigInt(toBlock),
-                event: parseAbiItem('event SwapTrade(address indexed tokenIn, address indexed tokenOut, address indexed trader, uint256 amountIn, uint256 amountOut, uint256 sellPrice, uint256 buyPrice)'),
+                event: parseAbiItem('event SwapTrade(address indexed tokenSold, address indexed tokenBought, address indexed trader, uint256 amountTokenSold, uint256 amountTokenBought, uint256 tradeSellPrice, uint256 updatedSellPrice, uint256 tradeBuyPrice, uint256 updatedBuyPrice)'),
                 args: {
-                    tokenIn: tokenIn.address as Address,
+                    tokenSold: tokenIn.address as Address,
                 },
                 strict: true
             });
@@ -442,15 +462,17 @@ export class ContractClient implements IContractClient {
                 (logs || []).map(log => this.getBlockTimestamp(log.blockNumber))
             );
             const tokensOut = await Promise.all(
-                (logs || []).map(async (log) => await this.getToken(log.args.tokenOut as Address))
+                (logs || []).map(async (log) => await this.getToken(log.args.tokenBought as Address))
             )
             result = (logs || []).map((log, index) => ({
                 tokenIn: tokenIn,
                 tokenOut: tokensOut[index],
-                amountIn: log.args.amountIn.toString(),
-                amountOut: log.args.amountOut.toString(),
-                sellPrice: log.args.sellPrice.toString(),
-                buyPrice: log.args.buyPrice.toString(),
+                amountIn: log.args.amountTokenSold.toString(),
+                amountOut: log.args.amountTokenBought.toString(),
+                sellPrice: log.args.tradeSellPrice.toString(),
+                buyPrice: log.args.tradeBuyPrice.toString(),
+                updatedBuyPrice: log.args.updatedBuyPrice.toString(),
+                updatedSellPrice: log.args.updatedSellPrice.toString(),
                 timestamp: timestamps[index],
             }));
             return result;
@@ -465,9 +487,9 @@ export class ContractClient implements IContractClient {
                 address: this.contractAddress,
                 fromBlock: BigInt(fromBlock),
                 toBlock: BigInt(toBlock),
-                event: parseAbiItem('event SwapTrade(address indexed tokenIn, address indexed tokenOut, address indexed trader, uint256 amountIn, uint256 amountOut, uint256 sellPrice, uint256 buyPrice)'),
+                event: parseAbiItem('event SwapTrade(address indexed tokenSold, address indexed tokenBought, address indexed trader, uint256 amountTokenSold, uint256 amountTokenBought, uint256 tradeSellPrice, uint256 updatedSellPrice, uint256 tradeBuyPrice, uint256 updatedBuyPrice)'),
                 args: {
-                    tokenOut: tokenOut.address as Address,
+                    tokenBought: tokenOut.address as Address,
                 },
                 strict: true
             });
@@ -476,15 +498,17 @@ export class ContractClient implements IContractClient {
                 (logs || []).map(log => this.getBlockTimestamp(log.blockNumber))
             );
             const tokensIn = await Promise.all(
-                (logs || []).map(async (log) => await this.getToken(log.args.tokenIn as Address))
+                (logs || []).map(async (log) => await this.getToken(log.args.tokenSold as Address))
             )
             result = (logs || []).map((log, index) => ({
                 tokenOut: tokenOut,
                 tokenIn: tokensIn[index],
-                amountIn: log.args.amountIn.toString(),
-                amountOut: log.args.amountOut.toString(),
-                sellPrice: log.args.sellPrice.toString(),
-                buyPrice: log.args.buyPrice.toString(),
+                amountIn: log.args.amountTokenSold.toString(),
+                amountOut: log.args.amountTokenBought.toString(),
+                sellPrice: log.args.tradeSellPrice.toString(),
+                buyPrice: log.args.tradeBuyPrice.toString(),
+                updatedBuyPrice: log.args.updatedBuyPrice.toString(),
+                updatedSellPrice: log.args.updatedSellPrice.toString(),
                 timestamp: timestamps[index],
             }));
             return result;
@@ -500,7 +524,7 @@ export class ContractClient implements IContractClient {
                     address: this.contractAddress,
                     fromBlock: BigInt(fromBlock),
                     toBlock: BigInt(toBlock),
-                    event: parseAbiItem('event SwapTrade(address indexed tokenIn, address indexed tokenOut, address indexed trader, uint256 amountIn, uint256 amountOut, uint256 sellPrice, uint256 buyPrice)'),
+                    event: parseAbiItem('event SwapTrade(address indexed tokenSold, address indexed tokenBought, address indexed trader, uint256 amountTokenSold, uint256 amountTokenBought, uint256 tradeSellPrice, uint256 updatedSellPrice, uint256 tradeBuyPrice, uint256 updatedBuyPrice)'),
                     args: {
                         trader: user as Address,
                     },
@@ -511,19 +535,21 @@ export class ContractClient implements IContractClient {
                     (logs || []).map(log => this.getBlockTimestamp(log.blockNumber))
                 );
                 const tokensIn = await Promise.all(
-                    (logs || []).map(async (log) => await this.getToken(log.args.tokenIn as Address))
+                    (logs || []).map(async (log) => await this.getToken(log.args.tokenSold as Address))
                 )
                 const tokensOut = await Promise.all(
-                    (logs || []).map(async (log) => await this.getToken(log.args.tokenOut as Address))
+                    (logs || []).map(async (log) => await this.getToken(log.args.tokenBought as Address))
                 )
                 result = (logs || []).map((log, index) => ({
                     token: token,
                     tokenIn: tokensIn[index],
                     tokenOut: tokensOut[index],
-                    amountIn: log.args.amountIn.toString(),
-                    amountOut: log.args.amountOut.toString(),
-                    sellPrice: log.args.sellPrice.toString(),
-                    buyPrice: log.args.buyPrice.toString(),
+                    amountIn: log.args.amountTokenSold.toString(),
+                    amountOut: log.args.amountTokenBought.toString(),
+                    sellPrice: log.args.tradeSellPrice.toString(),
+                    buyPrice: log.args.tradeBuyPrice.toString(),
+                    updatedBuyPrice: log.args.updatedBuyPrice.toString(),
+                    updatedSellPrice: log.args.updatedSellPrice.toString(),
                     timestamp: timestamps[index],
                 }));
                 return result;
@@ -622,7 +648,7 @@ export class ContractClient implements IContractClient {
                 address: this.contractAddress,
                 fromBlock: BigInt(fromBlock),
                 toBlock: BigInt(toBlock),
-                event: parseAbiItem('event Deposit(address indexed token, address indexed user, uint256 ethAmount, uint256 tokenAmount, uint256 lpTokensMinted)'),
+                event: parseAbiItem('event Deposit(address indexed token, address indexed user, uint256 amountEther, uint256 amountToken, uint256 lpTokensMinted)'),
                 args: {
                     token: (token?.address as Address),
                     user: user as Address | undefined
@@ -639,8 +665,8 @@ export class ContractClient implements IContractClient {
                 )
                 result = (logs || []).map((log, index) => ({
                     token: tokens[index],
-                    ethAmount: log.args.ethAmount.toString(),
-                    tokenAmount: log.args.tokenAmount.toString(),
+                    ethAmount: log.args.amountEther.toString(),
+                    tokenAmount: log.args.amountToken.toString(),
                     lpTokensMinted: log.args.lpTokensMinted.toString(),
                     timestamp: timestamps[index],
                 }));
@@ -648,8 +674,8 @@ export class ContractClient implements IContractClient {
             }
             result = (logs || []).map((log, index) => ({
                 token: token,
-                ethAmount: log.args.ethAmount.toString(),
-                tokenAmount: log.args.tokenAmount.toString(),
+                ethAmount: log.args.amountEther.toString(),
+                tokenAmount: log.args.amountToken.toString(),
                 lpTokensMinted: log.args.lpTokensMinted.toString(),
                 timestamp: timestamps[index],
             }));
@@ -665,7 +691,7 @@ export class ContractClient implements IContractClient {
                 address: this.contractAddress,
                 fromBlock: BigInt(fromBlock),
                 toBlock: BigInt(toBlock),
-                event: parseAbiItem('event withdraw(address indexed token, address indexed user, uint256 ethAmount, uint256 tokenAmount, uint256 lpTokensBurned)'),
+                event: parseAbiItem('event Withdraw(address indexed token, address indexed user, uint256 amountEther, uint256 amountToken, uint256 lpTokensBurned)'),
                 args: {
                     token: (token?.address as Address),
                     user: user as Address | undefined
@@ -682,8 +708,8 @@ export class ContractClient implements IContractClient {
                 )
                 result = (logs || []).map((log, index) => ({
                     token: tokens[index],
-                    ethAmount: log.args.ethAmount.toString(),
-                    tokenAmount: log.args.tokenAmount.toString(),
+                    ethAmount: log.args.amountEther.toString(),
+                    tokenAmount: log.args.amountToken.toString(),
                     lpTokensBurnt: log.args.lpTokensBurned.toString(),
                     timestamp: timestamps[index],
                 }));
@@ -691,8 +717,8 @@ export class ContractClient implements IContractClient {
             }
             result = (logs || []).map((log, index) => ({
                 token: token,
-                ethAmount: log.args.ethAmount.toString(),
-                tokenAmount: log.args.tokenAmount.toString(),
+                ethAmount: log.args.amountEther.toString(),
+                tokenAmount: log.args.amountToken.toString(),
                 lpTokensBurnt: log.args.lpTokensBurned.toString(),
                 timestamp: timestamps[index],
             }));
@@ -771,20 +797,6 @@ export class ContractClient implements IContractClient {
             throw new Error(`Error fetching pools: ${(error as Error).message}`);
         }
     }
-
-    // async getUserLiquidity(user: Address) : Promise<string> {
-    //     try {
-    //         const data = await this.publicClient?.readContract({
-    //             address: this.contractAddress,
-    //             abi: ABI,
-    //             functionName: 'liquidityProvided',
-    //             args: [user]
-    //         });
-    //         return data!.toString();
-    //     } catch (error) {
-    //         throw new Error(`Error fetching user liquidity: ${(error as Error).message}`);
-    //     }
-    // }
 
     async getUserPools(user: Address, startIndex: number, offset: number): Promise<RowPool[]> {
         try {
@@ -904,7 +916,7 @@ export class ContractClient implements IContractClient {
                 args: [token.address, BigInt(startIndex), BigInt(endIndex)]
             });
             const result: PoolFeesEvent[] = [];
-            if(!data) throw new Error("No data returned from readContract");
+            if (!data) throw new Error("No data returned from readContract");
             for (let i = 0; i < (data).length; i++) {
                 result.push({
                     timestamp: Number(data[i].timestamp) * 1000,

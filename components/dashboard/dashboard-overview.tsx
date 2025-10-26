@@ -1,6 +1,7 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { useAccount } from "wagmi";
 
 interface Stat {
   portfolioValue: string;
@@ -17,10 +18,12 @@ export function DashboardOverview({
   // profit,
   loading,
 }: Stat) {
+  const { chainId, chain } = useAccount();
+  const nativeCurrencySymbol = chain?.nativeCurrency?.symbol || "ETH";
   const stats = [
     {
       label: "Portfolio Value",
-      value: loading ? "..." : `${Number(portfolioValue).toFixed(8)} ETH`,
+      value: loading ? "..." : `${Number(portfolioValue).toFixed(8)} ${nativeCurrencySymbol}`,
     },
     // {
     //   label: "Total Liquidity",

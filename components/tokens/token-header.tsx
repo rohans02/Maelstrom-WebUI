@@ -2,12 +2,16 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Token } from "@/types/token";
+import { useAccount } from "wagmi";
 
 interface TokenHeaderProps {
   token: Token;
 }
 
 export function TokenHeader({ token }: TokenHeaderProps) {
+  const { chain } = useAccount();
+  const nativeCurrencySymbol = chain?.nativeCurrency?.symbol || "ETH";
+  
   return (
     <div className="relative p-6 rounded-lg overflow-hidden">
       {/* Glass background with gradient */}
@@ -30,7 +34,7 @@ export function TokenHeader({ token }: TokenHeaderProps) {
         <div className="space-y-1">
           <h1 className="text-2xl font-bold flex items-center gap-2 font-clash-display">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-white/90">
-              {token.symbol.toUpperCase()} / ETH Pool
+              {token.symbol.toUpperCase()} / {nativeCurrencySymbol} Pool
             </span>
           </h1>
           <div className="flex flex-wrap items-center gap-2">

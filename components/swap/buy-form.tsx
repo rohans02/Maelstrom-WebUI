@@ -6,11 +6,10 @@ import { SwapPreviewModal } from "@/components/swap/swap-preview-modal";
 import { toast } from "sonner";
 import { ArrowDownUp, HelpCircle, Settings } from "lucide-react";
 import { TokenSelector } from "./token-selector";
-import { Token } from "@/types/token";
+import { Token, getNativeCurrencyToken } from "@/types/token";
 import { BuyRequest, BuyResult } from "@/types/trades";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ContractClient } from "@/lib/contract-client";
-import { ETH } from "@/types/token";
 import { RowPool } from "@/types/pool";
 import { formatEther } from "viem";
 import {
@@ -51,6 +50,7 @@ export function BuyForm({
   );
   const { chain } = useAccount();
   const baseUrl = chain?.blockExplorers?.default.url;
+  const nativeCurrencySymbol = chain?.nativeCurrency?.symbol || "ETH";
   const [ethAmount, setEthAmount] = useState("");
   const [tokenAmount, setTokenAmount] = useState("");
   const [showPreview, setShowPreview] = useState(false);
@@ -206,7 +206,7 @@ export function BuyForm({
                 <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center">
                   <span className="text-sm font-bold text-accent">E</span>
                 </div>
-                <span className="text-base">ETH</span>
+                <span className="text-base">{nativeCurrencySymbol}</span>
               </div>
             </Button>
           )}
@@ -273,7 +273,7 @@ export function BuyForm({
                 <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center">
                   <span className="text-sm font-bold text-accent">E</span>
                 </div>
-                <span className="text-base">ETH</span>
+                <span className="text-base">{nativeCurrencySymbol}</span>
               </div>
             </Button>
           )}
@@ -286,7 +286,7 @@ export function BuyForm({
             <span className="text-white/50 font-medium">Rate</span>
             <span className="text-white/80 font-medium">
               1 {token.symbol.toUpperCase()} ={" "}
-              {Number(ethAmount) / Number(tokenAmount)} {"ETH"}
+              {Number(ethAmount) / Number(tokenAmount)} {nativeCurrencySymbol}
             </span>
           </div>
           {/* Slippage Tolerance - Only show in Advanced Mode */}
@@ -373,7 +373,7 @@ export function BuyForm({
         isOpen={showPreview}
         onClose={() => setShowPreview(false)}
         onConfirm={handleConfirmBuy}
-        tokenIn={ETH}
+        tokenIn={getNativeCurrencyToken(chain)}
         tokenOut={token}
         amountIn={ethAmount}
         amountOut={tokenAmount}

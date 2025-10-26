@@ -5,6 +5,7 @@ import type { RowPool } from "@/types/pool";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { formatEther } from "viem";
+import { useAccount } from "wagmi";
 
 interface TokenRowProps {
   poolToken: RowPool;
@@ -12,6 +13,8 @@ interface TokenRowProps {
 
 export function TokenRow({ poolToken }: TokenRowProps) {
   const { token, buyPrice, sellPrice, totalLiquidity } = poolToken;
+  const { chain } = useAccount();
+  const nativeCurrencySymbol = chain?.nativeCurrency?.symbol || "ETH";
 
   return (
     <Link
@@ -50,7 +53,7 @@ export function TokenRow({ poolToken }: TokenRowProps) {
           <div className="flex flex-col items-end min-w-[100px]">
             <div className="text-xs text-muted-foreground/60 mb-1">Buy Price</div>
             <div className="text-sm font-medium text-emerald-400">
-              {formatEther(BigInt(buyPrice))} ETH
+              {formatEther(BigInt(buyPrice))} {nativeCurrencySymbol}
             </div>
           </div>
 
@@ -58,7 +61,7 @@ export function TokenRow({ poolToken }: TokenRowProps) {
           <div className="flex flex-col items-end min-w-[100px]">
             <div className="text-xs text-muted-foreground/60 mb-1">Sell Price</div>
             <div className="text-sm font-medium text-red-400">
-              {formatEther(BigInt(sellPrice))} ETH
+              {formatEther(BigInt(sellPrice))} {nativeCurrencySymbol}
             </div>
           </div>
 
@@ -66,7 +69,7 @@ export function TokenRow({ poolToken }: TokenRowProps) {
           <div className="hidden lg:flex flex-col items-end min-w-[120px]">
             <div className="text-xs text-muted-foreground/60 mb-1">Total Liquidity</div>
             <div className="text-sm font-medium text-white/90">
-              {formatEther(BigInt(totalLiquidity))} ETH
+              {formatEther(BigInt(totalLiquidity))} {nativeCurrencySymbol}
             </div>
           </div>
 

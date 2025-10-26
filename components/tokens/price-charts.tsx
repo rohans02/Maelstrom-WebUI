@@ -4,13 +4,19 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Area,
-  AreaChart,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip as ChartTooltip,
+  Legend,
+  Filler,
+  ChartOptions,
+  ScriptableContext,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
 import { Token } from "@/types/token";
 import { Pool } from "@/types/pool";
 import { BuyTrade, SellTrade } from "@/types/trades";
@@ -19,17 +25,37 @@ import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { formatEther } from "viem";
 import { RefreshCw, Clock, TrendingUp } from "lucide-react";
 
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  ChartTooltip,
+  Legend,
+  Filler
+);
+
 interface PriceChartsProps {
   token: Token;
   pool: Pool;
 }
 
 interface ChartDataPoint {
-  time: string;
-  buyPrice: number;
-  sellPrice: number;
+  x: number; // timestamp
+  y: number | null; // price value
   formattedTime: string;
+  isStep?: boolean; // indicates if this is a step point (same timestamp as previous)
+}
+
+interface TradeData {
   timestamp: number;
+  buyPriceBefore?: number;
+  buyPriceAfter?: number;
+  sellPriceBefore?: number;
+  sellPriceAfter?: number;
+  formattedTime: string;
 }
 
 const BLOCKS_PER_FETCH = 999; // Load 1000 blocks at a time
@@ -37,68 +63,93 @@ const BLOCKS_PER_FETCH = 999; // Load 1000 blocks at a time
 export function PriceCharts({ token, pool }: PriceChartsProps) {
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
-  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [tradeData, setTradeData] = useState<TradeData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nextBlockToFetch, setNextBlockToFetch] = useState<number | null>(null);
   const [hasMoreData, setHasMoreData] = useState(true);
-  const { chainId } = useAccount();
+  const { chainId, chain } = useAccount();
+  const nativeCurrencySymbol = chain?.nativeCurrency?.symbol || "ETH";
   const contractClient = useMemo(
     () => new ContractClient(writeContractAsync, publicClient, chainId),
-    [chainId]
+    [chainId, writeContractAsync, publicClient]
   );
 
-  const generateChartData = useCallback(
-    (buyTrades: BuyTrade[], sellTrades: SellTrade[]): ChartDataPoint[] => {
-      // Combine and sort all trades by timestamp
-      const allTrades = [
-        ...buyTrades.map((trade) => ({
-          ...trade,
-          type: "buy" as const,
-          buyPrice: parseFloat(formatEther(BigInt(trade.buyPrice))),
-          sellPrice: 0,
-        })),
-        ...sellTrades.map((trade) => ({
-          ...trade,
-          type: "sell" as const,
-          buyPrice: 0,
-          sellPrice: parseFloat(formatEther(BigInt(trade.sellPrice))),
-        })),
-      ].sort((a, b) => a.timestamp - b.timestamp);
+  const processTradeData = useCallback(
+    (buyTrades: BuyTrade[], sellTrades: SellTrade[]): TradeData[] => {
+      // Create a map to merge trades at the same timestamp
+      const tradeMap = new Map<number, TradeData>();
 
-      if (allTrades.length === 0) {
-        return [];
-      }
-
-      // Create chart data points from trades
-      // Use the last known price for missing values
-      let lastBuyPrice = parseFloat(formatEther(BigInt(pool.buyPrice)));
-      let lastSellPrice = parseFloat(formatEther(BigInt(pool.sellPrice)));
-
-      return allTrades.map((trade) => {
-        if (trade.type === "buy" && trade.buyPrice > 0) {
-          lastBuyPrice = trade.buyPrice;
-        }
-        if (trade.type === "sell" && trade.sellPrice > 0) {
-          lastSellPrice = trade.sellPrice;
-        }
-
+      // Process buy trades - now includes both buy and sell prices
+      buyTrades.forEach((trade) => {
         const tradeDate = new Date(trade.timestamp);
-        return {
-          time: tradeDate.toISOString(),
-          buyPrice: trade.type === "buy" ? trade.buyPrice : lastBuyPrice,
-          sellPrice: trade.type === "sell" ? trade.sellPrice : lastSellPrice,
-          formattedTime: tradeDate.toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          timestamp: trade.timestamp,
-        };
+        const formattedTime = tradeDate.toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        const buyPriceBefore = parseFloat(formatEther(BigInt(trade.buyPrice)));
+        const buyPriceAfter = parseFloat(formatEther(BigInt(trade.updatedBuyPrice)));
+        const sellPrice = parseFloat(formatEther(BigInt(trade.sellPrice)));
+
+        if (tradeMap.has(trade.timestamp)) {
+          const existing = tradeMap.get(trade.timestamp)!;
+          existing.buyPriceBefore = buyPriceBefore;
+          existing.buyPriceAfter = buyPriceAfter;
+          // Sell price doesn't change during buy trade
+          existing.sellPriceBefore = sellPrice;
+          existing.sellPriceAfter = sellPrice;
+        } else {
+          tradeMap.set(trade.timestamp, {
+            timestamp: trade.timestamp,
+            buyPriceBefore,
+            buyPriceAfter,
+            sellPriceBefore: sellPrice,
+            sellPriceAfter: sellPrice,
+            formattedTime,
+          });
+        }
       });
+
+      // Process sell trades - now includes both sell and buy prices
+      sellTrades.forEach((trade) => {
+        const tradeDate = new Date(trade.timestamp);
+        const formattedTime = tradeDate.toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        const sellPriceBefore = parseFloat(formatEther(BigInt(trade.sellPrice)));
+        const sellPriceAfter = parseFloat(formatEther(BigInt(trade.updatedSellPrice)));
+        const buyPrice = parseFloat(formatEther(BigInt(trade.buyPrice)));
+
+        if (tradeMap.has(trade.timestamp)) {
+          const existing = tradeMap.get(trade.timestamp)!;
+          existing.sellPriceBefore = sellPriceBefore;
+          existing.sellPriceAfter = sellPriceAfter;
+          // Buy price doesn't change during sell trade
+          existing.buyPriceBefore = buyPrice;
+          existing.buyPriceAfter = buyPrice;
+        } else {
+          tradeMap.set(trade.timestamp, {
+            timestamp: trade.timestamp,
+            buyPriceBefore: buyPrice,
+            buyPriceAfter: buyPrice,
+            sellPriceBefore,
+            sellPriceAfter,
+            formattedTime,
+          });
+        }
+      });
+
+      // Convert to array and sort by timestamp
+      return Array.from(tradeMap.values()).sort((a, b) => a.timestamp - b.timestamp);
     },
-    [pool.buyPrice, pool.sellPrice]
+    []
   );
 
   const fetchNextBatch = useCallback(async () => {
@@ -130,18 +181,19 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
 
       console.log("Fetched trades from blocks", fromBlock, "to", toBlock);
 
-      // Generate chart data from trades
-      const newChartData = generateChartData(buyTrades, sellTrades);
+      // Process trade data
+      const newTradeData = processTradeData(buyTrades, sellTrades);
 
       // Add new data to existing data
-      setChartData((prevData) => {
-        const combined = [...prevData, ...newChartData];
+      setTradeData((prevData) => {
+        const combined = [...prevData, ...newTradeData];
         // Sort by timestamp and remove duplicates
         const uniqueData = Array.from(
           new Map(combined.map((item) => [item.timestamp, item])).values()
         ).sort((a, b) => a.timestamp - b.timestamp);
         return uniqueData;
       });
+
       // Update next block to fetch
       if (fromBlock > 0) {
         setNextBlockToFetch(fromBlock - 1);
@@ -160,7 +212,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
     publicClient,
     contractClient,
     token,
-    generateChartData,
+    processTradeData,
     nextBlockToFetch,
     hasMoreData,
     loading,
@@ -174,28 +226,230 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
   const currentBuyPrice = parseFloat(formatEther(BigInt(pool.buyPrice)));
   const currentSellPrice = parseFloat(formatEther(BigInt(pool.sellPrice)));
 
-  // Display data - use chart data if available, otherwise show current pool prices
-  const displayData = useMemo(() => {
-    if (chartData.length > 0) {
-      return chartData;
-    }
-    // Show current pool prices as a single data point when no historical data
-    const now = new Date();
-    return [
+  // Create chart data with step pattern and linear interpolation
+  const { buyChartData, sellChartData } = useMemo(() => {
+    const now = Date.now();
+    const formattedNow = new Date().toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    // Add current prices to trade data
+    const allData = [...tradeData, {
+      timestamp: now,
+      buyPriceBefore: currentBuyPrice,
+      buyPriceAfter: currentBuyPrice,
+      sellPriceBefore: currentSellPrice,
+      sellPriceAfter: currentSellPrice,
+      formattedTime: formattedNow,
+    }];
+
+    const buyPoints: ChartDataPoint[] = [];
+    const sellPoints: ChartDataPoint[] = [];
+
+    allData.forEach((trade, index) => {
+      // Every trade now has both buy and sell price data
+      const hasBuyData = trade.buyPriceBefore !== undefined && trade.buyPriceAfter !== undefined;
+      const hasSellData = trade.sellPriceBefore !== undefined && trade.sellPriceAfter !== undefined;
+
+      // Handle buy price
+      if (hasBuyData) {
+        // Only add step pattern if price changed during this trade
+        if (trade.buyPriceBefore !== trade.buyPriceAfter) {
+          // Add the "before" price at this timestamp
+          buyPoints.push({
+            x: trade.timestamp,
+            y: trade.buyPriceBefore!,
+            formattedTime: trade.formattedTime,
+            isStep: true,
+          });
+
+          // Add the "after" price at same timestamp (vertical step)
+          buyPoints.push({
+            x: trade.timestamp,
+            y: trade.buyPriceAfter!,
+            formattedTime: trade.formattedTime,
+            isStep: true,
+          });
+        } else {
+          // If price didn't change, just add a single point
+          buyPoints.push({
+            x: trade.timestamp,
+            y: trade.buyPriceAfter!,
+            formattedTime: trade.formattedTime,
+            isStep: false,
+          });
+        }
+      }
+
+      // Handle sell price
+      if (hasSellData) {
+        // Only add step pattern if price changed during this trade
+        if (trade.sellPriceBefore !== trade.sellPriceAfter) {
+          // Add the "before" price at this timestamp
+          sellPoints.push({
+            x: trade.timestamp,
+            y: trade.sellPriceBefore!,
+            formattedTime: trade.formattedTime,
+            isStep: true,
+          });
+
+          // Add the "after" price at same timestamp (vertical step)
+          sellPoints.push({
+            x: trade.timestamp,
+            y: trade.sellPriceAfter!,
+            formattedTime: trade.formattedTime,
+            isStep: true,
+          });
+        } else {
+          // If price didn't change, just add a single point
+          sellPoints.push({
+            x: trade.timestamp,
+            y: trade.sellPriceAfter!,
+            formattedTime: trade.formattedTime,
+            isStep: false,
+          });
+        }
+      }
+    });
+
+    return { buyChartData: buyPoints, sellChartData: sellPoints };
+  }, [tradeData, currentBuyPrice, currentSellPrice]);
+
+  // Chart.js configuration
+  const chartData = {
+    datasets: [
       {
-        time: now.toISOString(),
-        buyPrice: currentBuyPrice,
-        sellPrice: currentSellPrice,
-        formattedTime: now.toLocaleString("en-US", {
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        timestamp: Date.now(),
+        label: 'Buy Price',
+        data: buyChartData,
+        borderColor: 'rgb(16, 185, 129)',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        fill: true,
+        tension: 0, // No curve, straight lines
+        parsing: {
+          xAxisKey: 'x',
+          yAxisKey: 'y',
+        },
       },
-    ];
-  }, [chartData, currentBuyPrice, currentSellPrice]);
+      {
+        label: 'Sell Price',
+        data: sellChartData,
+        borderColor: 'rgb(239, 68, 68)',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        fill: true,
+        tension: 0, // No curve, straight lines
+        parsing: {
+          xAxisKey: 'x',
+          yAxisKey: 'y',
+        },
+      },
+    ],
+  };
+
+  const chartOptions: ChartOptions<'line'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'nearest',
+      axis: 'x',
+      intersect: false,
+    },
+    scales: {
+      x: {
+        type: 'linear',
+        ticks: {
+          color: 'rgb(148, 163, 184)',
+          callback: function(value) {
+            return new Date(value as number).toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          },
+          maxRotation: 45,
+          minRotation: 0,
+        },
+        grid: {
+          color: 'rgba(255, 255, 255, 0.05)',
+          display: false,
+        },
+        border: {
+          display: false,
+        },
+      },
+      y: {
+        ticks: {
+          color: 'rgb(148, 163, 184)',
+          callback: function(value) {
+            return `${Number(value).toFixed(8)}`;
+          },
+        },
+        grid: {
+          color: 'rgba(255, 255, 255, 0.05)',
+        },
+        border: {
+          display: false,
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        backgroundColor: 'rgba(17, 25, 40, 0.95)',
+        titleColor: 'rgb(148, 163, 184)',
+        bodyColor: 'rgb(255, 255, 255)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderWidth: 1,
+        padding: 12,
+        displayColors: true,
+        callbacks: {
+          title: function(context) {
+            if (context[0]) {
+              const point = context[0].raw as ChartDataPoint;
+              return point.formattedTime;
+            }
+            return '';
+          },
+          label: function(context) {
+            const value = context.parsed.y;
+            if (value === null) return '';
+            const label = context.dataset.label;
+            return `${label}: ${value.toFixed(8)} ${nativeCurrencySymbol}`;
+          },
+        },
+      },
+    },
+  };
+
+  const totalDataPoints = tradeData.length;
+
+  // Calculate statistics
+  const avgBuyPrice = useMemo(() => {
+    const buyPrices = tradeData
+      .map(t => t.buyPriceAfter)
+      .filter((p): p is number => p !== undefined);
+    if (buyPrices.length === 0) return currentBuyPrice;
+    return buyPrices.reduce((sum, price) => sum + price, 0) / buyPrices.length;
+  }, [tradeData, currentBuyPrice]);
+
+  const avgSellPrice = useMemo(() => {
+    const sellPrices = tradeData
+      .map(t => t.sellPriceAfter)
+      .filter((p): p is number => p !== undefined);
+    if (sellPrices.length === 0) return currentSellPrice;
+    return sellPrices.reduce((sum, price) => sum + price, 0) / sellPrices.length;
+  }, [tradeData, currentSellPrice]);
 
   return (
     <div className="space-y-6">
@@ -204,8 +458,8 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
         <div>
           <h3 className="text-xl font-semibold text-white">Price Charts</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            {chartData.length > 0
-              ? `${chartData.length} data points loaded`
+            {totalDataPoints > 0
+              ? `${totalDataPoints} trade events loaded`
               : "No data yet"}
           </p>
         </div>
@@ -242,204 +496,70 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Buy Price Chart */}
-        <Card className="relative overflow-hidden">
-          {/* Glass morphism effects */}
-          <div className="absolute inset-0 bg-background-800/40 backdrop-blur-xl" />
-          <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.08] to-primary-500/[0.05]" />
-          <div className="absolute inset-0 border border-white/[0.05] rounded-lg" />
+      {/* Combined Price Chart */}
+      <Card className="relative overflow-hidden">
+        {/* Glass morphism effects */}
+        <div className="absolute inset-0 bg-background-800/40 backdrop-blur-xl" />
+        <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.08] to-primary-500/[0.05]" />
+        <div className="absolute inset-0 border border-white/[0.05] rounded-lg" />
 
-          <CardContent className="relative p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h4 className="text-sm text-muted-foreground font-medium">
-                  Buy Price
-                </h4>
-                <p className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-500">
-                  {currentBuyPrice} ETH
-                </p>
-                <div className="flex items-center mt-1 text-xs text-muted-foreground">
-                  {chartData.length > 0
-                    ? `${chartData.length} data points`
-                    : "No data"}
+        <CardContent className="relative p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex-1">
+              <h4 className="text-sm text-muted-foreground font-medium mb-3">
+                Price Chart
+              </h4>
+              <div className="flex items-center gap-8">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Buy Price</p>
+                  <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-500">
+                    {currentBuyPrice.toFixed(8)} {nativeCurrencySymbol}
+                  </p>
                 </div>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="h-[300px] w-full flex items-center justify-center">
-                <div className="text-center">
-                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-emerald-500" />
-                  <p className="text-sm text-muted-foreground">
-                    Loading price data...
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Sell Price</p>
+                  <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-red-500">
+                    {currentSellPrice.toFixed(8)} {nativeCurrencySymbol}
                   </p>
                 </div>
               </div>
-            ) : (
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={displayData}>
-                    <defs>
-                      <linearGradient
-                        id="buyGradient"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="0%"
-                          stopColor="rgb(16, 185, 129)"
-                          stopOpacity={0.2}
-                        />
-                        <stop
-                          offset="99%"
-                          stopColor="rgb(16, 185, 129)"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <XAxis
-                      dataKey="formattedTime"
-                      tick={{ fill: "rgb(148, 163, 184)", fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      tick={{ fill: "rgb(148, 163, 184)", fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `${value}`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: "rgba(17, 25, 40, 0.8)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        borderRadius: "8px",
-                        backdropFilter: "blur(16px)",
-                      }}
-                      labelStyle={{ color: "rgb(148, 163, 184)" }}
-                      labelFormatter={(label) => label}
-                      formatter={(value: number) => [
-                        `${value.toFixed(8)} ETH`,
-                        "Buy Price",
-                      ]}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="buyPrice"
-                      stroke="rgb(16, 185, 129)"
-                      fill="url(#buyGradient)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Sell Price Chart */}
-        <Card className="relative overflow-hidden">
-          {/* Glass morphism effects */}
-          <div className="absolute inset-0 bg-background-800/40 backdrop-blur-xl" />
-          <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.08] to-primary-500/[0.05]" />
-          <div className="absolute inset-0 border border-white/[0.05] rounded-lg" />
-
-          <CardContent className="relative p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h4 className="text-sm text-muted-foreground font-medium">
-                  Sell Price
-                </h4>
-                <p className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-red-500">
-                  {currentSellPrice} ETH
-                </p>
-                <div className="flex items-center mt-1 text-xs text-muted-foreground">
-                  {chartData.length > 0
-                    ? `${chartData.length} data points`
-                    : "No data"}
-                </div>
+              <div className="flex items-center mt-2 text-xs text-muted-foreground">
+                {totalDataPoints > 0
+                  ? `${totalDataPoints} trade events`
+                  : "No data"}
               </div>
             </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                <span className="text-xs text-muted-foreground">Buy</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500" />
+                <span className="text-xs text-muted-foreground">Sell</span>
+              </div>
+            </div>
+          </div>
 
-            {loading ? (
-              <div className="h-[300px] w-full flex items-center justify-center">
-                <div className="text-center">
-                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-red-500" />
-                  <p className="text-sm text-muted-foreground">
-                    Loading price data...
-                  </p>
-                </div>
+          {loading && totalDataPoints === 0 ? (
+            <div className="h-[400px] w-full flex items-center justify-center">
+              <div className="text-center">
+                <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-accent-blue" />
+                <p className="text-sm text-muted-foreground">
+                  Loading price data...
+                </p>
               </div>
-            ) : (
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={displayData}>
-                    <defs>
-                      <linearGradient
-                        id="sellGradient"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="0%"
-                          stopColor="rgb(239, 68, 68)"
-                          stopOpacity={0.2}
-                        />
-                        <stop
-                          offset="99%"
-                          stopColor="rgb(239, 68, 68)"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <XAxis
-                      dataKey="formattedTime"
-                      tick={{ fill: "rgb(148, 163, 184)", fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      tick={{ fill: "rgb(148, 163, 184)", fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `${value}`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: "rgba(17, 25, 40, 0.8)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
-                        borderRadius: "8px",
-                        backdropFilter: "blur(16px)",
-                      }}
-                      labelStyle={{ color: "rgb(148, 163, 184)" }}
-                      labelFormatter={(label) => label}
-                      formatter={(value: number) => [
-                        `${value} ETH`,
-                        "Sell Price",
-                      ]}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="sellPrice"
-                      stroke="rgb(239, 68, 68)"
-                      fill="url(#sellGradient)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          ) : (
+            <div className="h-[400px] w-full">
+              <Line data={chartData} options={chartOptions} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Price Summary Stats */}
-      {chartData.length > 0 && !loading && (
+      {totalDataPoints > 0 && (
         <Card className="relative overflow-hidden">
           <div className="absolute inset-0 bg-background-800/40 backdrop-blur-xl" />
           <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.08] to-primary-500/[0.05]" />
@@ -457,7 +577,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
                 </div>
                 <div className="text-sm font-medium text-white">
                   {(
-                    ((currentBuyPrice - currentSellPrice) / currentSellPrice) *
+                    ((currentBuyPrice - currentSellPrice) / ((currentSellPrice + currentBuyPrice)/2)) *
                     100
                   ).toFixed(2)}
                   %
@@ -469,11 +589,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
                   Avg Buy Price
                 </div>
                 <div className="text-sm font-medium text-emerald-400">
-                  {(
-                    chartData.reduce((sum, point) => sum + point.buyPrice, 0) /
-                    chartData.length
-                  )}{" "}
-                  ETH
+                  {avgBuyPrice.toFixed(8)} {nativeCurrencySymbol}
                 </div>
               </div>
 
@@ -482,20 +598,16 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
                   Avg Sell Price
                 </div>
                 <div className="text-sm font-medium text-red-400">
-                  {(
-                    chartData.reduce((sum, point) => sum + point.sellPrice, 0) /
-                    chartData.length
-                  )}{" "}
-                  ETH
+                  {avgSellPrice.toFixed(8)} {nativeCurrencySymbol}
                 </div>
               </div>
 
               <div className="text-center p-3 bg-white/[0.02] rounded-lg border border-white/[0.05]">
                 <div className="text-xs text-muted-foreground mb-1">
-                  Data Points
+                  Trade Events
                 </div>
                 <div className="text-sm font-medium text-accent-blue">
-                  {chartData.length}
+                  {totalDataPoints}
                 </div>
               </div>
             </div>
@@ -503,7 +615,7 @@ export function PriceCharts({ token, pool }: PriceChartsProps) {
             <div className="mt-4 pt-4 border-t border-white/[0.05]">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Data Points:</span>
-                <span className="text-white">{chartData.length}</span>
+                <span className="text-white">{buyChartData.length + sellChartData.length}</span>
               </div>
               <div className="flex items-center justify-between text-sm mt-2">
                 <span className="text-muted-foreground">Last Updated:</span>

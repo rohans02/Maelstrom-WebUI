@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight } from "lucide-react";
 import { Token } from "@/types/token";
+import { useAccount } from "wagmi";
 
 interface LiquidityPreviewModalProps {
   isOpen: boolean;
@@ -34,6 +35,9 @@ export function LiquidityPreviewModal({
   lpAmount,
   loading = false,
 }: LiquidityPreviewModalProps) {
+  const { chain } = useAccount();
+  const nativeCurrencySymbol = chain?.nativeCurrency?.symbol || "ETH";
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="border border-white/[0.05] bg-gradient-to-b from-bg-800/95 to-bg-900/95 backdrop-blur-xl shadow-2xl">
@@ -62,7 +66,7 @@ export function LiquidityPreviewModal({
                         {tokenAmount} {token.symbol.toUpperCase()}
                       </p>
                       <p className="text-base font-semibold text-white/90 font-plus-jakarta">
-                        {ethAmount} ETH
+                        {ethAmount} {nativeCurrencySymbol}
                       </p>
                     </div>
                   )}
@@ -81,7 +85,7 @@ export function LiquidityPreviewModal({
                         {tokenAmount} {token.symbol.toUpperCase()}
                       </p>
                       <p className="text-base font-semibold text-white/90 font-plus-jakarta">
-                        {ethAmount} ETH
+                        {ethAmount} {nativeCurrencySymbol}
                       </p>
                     </div>
                   ) : (

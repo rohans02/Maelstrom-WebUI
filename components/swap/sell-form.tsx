@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { ArrowDownUp, HelpCircle, Settings } from "lucide-react";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ContractClient } from "@/lib/contract-client";
-import { ETH, Token } from "@/types/token";
+import { Token, getNativeCurrencyToken } from "@/types/token";
 import { SellRequest, SellResult } from "@/types/trades";
 import { RowPool } from "@/types/pool";
 import { formatEther } from "viem";
@@ -50,6 +50,7 @@ export function SellForm({
   );
   const { chain } = useAccount();
   const baseUrl = chain?.blockExplorers?.default.url;
+  const nativeCurrencySymbol = chain?.nativeCurrency?.symbol || "ETH";
   const [ethAmount, setEthAmount] = useState("");
   const [token, setToken] = useState<Token | undefined>(undefined);
   const [tokenAmount, setTokenAmount] = useState("");
@@ -74,7 +75,7 @@ export function SellForm({
       if (Number(ethValue) * 1e18 > Number(ethInReserve) * 0.1) {
         const maxEthAllowed = String((Number(ethInReserve) * 0.1) / 1e18);
         setValidationError(
-          `Amount exceeds 10% of reserve. Maximum: ${maxEthAllowed} ETH`
+          `Amount exceeds 10% of reserve. Maximum: ${maxEthAllowed} ${nativeCurrencySymbol}`
         );
         return "";
       }
@@ -84,7 +85,7 @@ export function SellForm({
       if (Number(value) * 1e18 > Number(ethInReserve) * 0.1) {
         const maxEthAllowed = String((Number(ethInReserve) * 0.1) / 1e18);
         setValidationError(
-          `Amount exceeds 10% of reserve. Maximum: ${maxEthAllowed} ETH`
+          `Amount exceeds 10% of reserve. Maximum: ${maxEthAllowed} ${nativeCurrencySymbol}`
         );
         return "";
       }
@@ -189,7 +190,7 @@ export function SellForm({
                   <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center">
                     <span className="text-sm font-bold text-accent">E</span>
                   </div>
-                  <span className="text-base">ETH</span>
+                  <span className="text-base">{nativeCurrencySymbol}</span>
                 </div>
               </Button>
             </>
@@ -288,7 +289,7 @@ export function SellForm({
                   <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center">
                     <span className="text-sm font-bold text-accent">E</span>
                   </div>
-                  <span className="text-base">ETH</span>
+                  <span className="text-base">{nativeCurrencySymbol}</span>
                 </div>
               </Button>
             </>
@@ -302,7 +303,7 @@ export function SellForm({
             <span className="text-white/50 font-medium">Rate</span>
             <span className="text-white/80 font-medium">
               1 {token.symbol.toUpperCase()} ={" "}
-              {Number(ethAmount) / Number(tokenAmount)} {"ETH"}
+              {Number(ethAmount) / Number(tokenAmount)} {nativeCurrencySymbol}
             </span>
           </div>
           {/* Slippage Tolerance - Only show in Advanced Mode */}
@@ -390,7 +391,7 @@ export function SellForm({
         onClose={() => setShowPreview(false)}
         onConfirm={handleConfirmSell}
         tokenIn={token!}
-        tokenOut={ETH}
+        tokenOut={getNativeCurrencyToken(chain)}
         amountIn={tokenAmount}
         amountOut={ethAmount}
         loading={isSwapping}

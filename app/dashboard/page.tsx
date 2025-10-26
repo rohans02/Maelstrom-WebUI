@@ -65,38 +65,40 @@ export default function DashboardPage() {
   };
 
   const fetchRecentDeposits = async () => {
-    if (!address) return;
+    if (!address) return [];
     try {
       const currentBlock = await publicClient?.getBlock();
-      if (!currentBlock) return;
+      if (!currentBlock) return [];
       const deposits = await contractClient.getDepositEventLogs(
         Number(currentBlock.number) - 999,
         Number(currentBlock.number),
         undefined,
         address
       );
-      setEvents(deposits);
+      return deposits;
     } catch (error) {
       console.error("Error fetching recent deposits:", error);
       toast.error("Failed to fetch recent deposits.");
+      return [];
     }
   };
 
   const fetchRecentWithdrawals = async () => {
-    if (!address) return;
+    if (!address) return [];
     try {
       const currentBlock = await publicClient?.getBlock();
-      if (!currentBlock) return;
+      if (!currentBlock) return [];
       const withdrawals = await contractClient.getWithdrawEventLogs(
         Number(currentBlock.number) - 999,
         Number(currentBlock.number),
         undefined,
         address
       );
-      setEvents((prevEvents) => [...prevEvents, ...withdrawals]);
+      return withdrawals;
     } catch (error) {
       console.error("Error fetching recent withdrawals:", error);
       toast.error("Failed to fetch recent withdrawals.");
+      return [];
     }
   };
 
@@ -119,13 +121,19 @@ export default function DashboardPage() {
       try {
         setIsLoading(true);
         
-        // Fetch all data
         const count = await fetchPoolCount();
         if (count === undefined) throw new Error("Pool count is undefined");
         
         await fetchUserPools(count);
-        await fetchRecentDeposits();
-        await fetchRecentWithdrawals();
+        
+        // Fetch deposits and withdrawals in parallel and combine them
+        const [deposits, withdrawals] = await Promise.all([
+          fetchRecentDeposits(),
+          fetchRecentWithdrawals()
+        ]);
+        
+        // Combine and set all events at once to avoid duplicates
+        setEvents([...deposits, ...withdrawals]);
         
       } catch (error) {
         console.error("Error fetching dashboard data:", error);

@@ -42,7 +42,7 @@ export interface InitPool{
   token: string
   ethAmount: string
   tokenAmount: string
-  inititalBuyPrice: string
+  initialBuyPrice: string
   initialSellPrice: string
 }
 

@@ -3,12 +3,15 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Pool } from "@/types/pool";
 import { formatEther } from "viem";
+import { useAccount } from "wagmi";
 
 interface LiquidityBreakdownProps {
   poolData: Pool;
 }
 
 export function LiquidityBreakdown({ poolData }: LiquidityBreakdownProps) {
+  const { chain } = useAccount();
+  const nativeCurrencySymbol = chain?.nativeCurrency?.symbol || "ETH";
   const APR = (poolData.apr).toFixed(2) + "%";
   const symbol = poolData.token.symbol;
   const avgPrice = (Number(poolData.avgPrice) / 1e18).toFixed(8).replace(/\.?0+$/, '');
@@ -83,7 +86,7 @@ export function LiquidityBreakdown({ poolData }: LiquidityBreakdownProps) {
                 Current Price
               </div>
               <div className="text-lg font-semibold text-white">
-                {avgPrice} ETH
+                {avgPrice} {nativeCurrencySymbol}
               </div>
             </div>
             <div className="bg-black/10 rounded-xl p-4 mb-3">
@@ -111,7 +114,7 @@ export function LiquidityBreakdown({ poolData }: LiquidityBreakdownProps) {
               </div>
               <div>
                 <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/90 font-plus-jakarta">
-                  ETH
+                  {nativeCurrencySymbol}
                 </span>
               </div>
             </div>
@@ -128,7 +131,7 @@ export function LiquidityBreakdown({ poolData }: LiquidityBreakdownProps) {
                 Amount
               </div>
               <div className="text-lg font-semibold text-white">
-                {ethReserve} ETH
+                {ethReserve} {nativeCurrencySymbol}
               </div>
             </div>
             <div className="bg-black/10 rounded-xl p-4 mb-3">
@@ -162,7 +165,7 @@ export function LiquidityBreakdown({ poolData }: LiquidityBreakdownProps) {
             <span>
               {tokenPercentage}% {symbol}
             </span>
-            <span>{ethPercentage}% ETH</span>
+            <span>{ethPercentage}% {nativeCurrencySymbol}</span>
           </div>
         </div>
       </CardContent>

@@ -3,6 +3,7 @@
 import { Deposit, Withdraw } from "@/types/trades";
 import { useEffect, useState } from "react";
 import { formatEther } from "viem";
+import { useAccount } from "wagmi";
 
 interface RecentActivityProps {
   events: (Deposit | Withdraw)[];
@@ -16,6 +17,8 @@ interface Activity {
 }
 
 export function RecentActivity({ events }: RecentActivityProps) {
+  const { chainId, chain } = useAccount();
+  const nativeCurrencySymbol = chain?.nativeCurrency?.symbol || "ETH";
   const [transactions, setTransactions] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -28,7 +31,7 @@ export function RecentActivity({ events }: RecentActivityProps) {
         return {
           type: "Deposit",
           token: event.token.symbol,
-          amount: `${formatEther(BigInt(event.ethAmount))} ETH + ${formatEther(
+          amount: `${formatEther(BigInt(event.ethAmount))} ${nativeCurrencySymbol} + ${formatEther(
             BigInt(event.tokenAmount)
           )} ${event.token.symbol}`,
           timestamp: event.timestamp,
@@ -37,7 +40,7 @@ export function RecentActivity({ events }: RecentActivityProps) {
         return {
           type: "Withdraw",
           token: event.token.symbol,
-          amount: `${formatEther(BigInt(event.ethAmount))} ETH + ${formatEther(
+          amount: `${formatEther(BigInt(event.ethAmount))} ${nativeCurrencySymbol} + ${formatEther(
             BigInt(event.tokenAmount)
           )} ${event.token.symbol}`,
           timestamp: event.timestamp,
@@ -54,7 +57,7 @@ export function RecentActivity({ events }: RecentActivityProps) {
         Recent Activity
       </h2>
       <div className="space-y-4">
-        {isLoading  ? (
+        {isLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
