@@ -29,34 +29,46 @@ export function HeroSection() {
 
     const calculateTextPositions = () => {
       const centerY = window.innerHeight / 2;
+      const centerX = window.innerWidth / 2;
+      const isMobile = window.innerWidth < 768;
+      const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
+      
+      const headingSize = isMobile ? 36 : isTablet ? 70 : 100;
+      const subheadingSize = isMobile ? 14 : isTablet ? 22 : 28;
+      const verticalSpacing = isMobile ? 0.6 : 1;
+      
+      // Add padding for mobile to prevent text overflow
+      const horizontalPadding = isMobile ? 20 : 0;
+      const maxWidth = window.innerWidth - (horizontalPadding * 2);
+      
       setTextPositions([
         {
           text: "Auction-Based",
-          size: 100,
-          x: window.innerWidth / 2,
-          y: centerY - 55, // Adjusted position
+          size: headingSize,
+          x: centerX,
+          y: centerY - (55 * verticalSpacing),
           weight: "700",
         },
         {
           text: "Liquidity Pools",
-          size: 100,
-          x: window.innerWidth / 2,
-          y: centerY + 45, // Adjusted position
+          size: headingSize,
+          x: centerX,
+          y: centerY + (45 * verticalSpacing),
           weight: "700",
         },
         {
           text: "Automated Market Making",
-          size: 28,
-          x: window.innerWidth / 2,
-          y: centerY + 120, // Adjusted position
+          size: subheadingSize,
+          x: centerX,
+          y: centerY + (120 * verticalSpacing),
           font: "Plus Jakarta Sans, sans-serif",
           weight: "500",
         },
         {
           text: "with Proper Price Discovery",
-          size: 28,
-          x: window.innerWidth / 2,
-          y: centerY + 160, // Adjusted position
+          size: subheadingSize,
+          x: centerX,
+          y: centerY + (160 * verticalSpacing),
           font: "Plus Jakarta Sans, sans-serif",
           weight: "500",
         },
@@ -76,7 +88,7 @@ export function HeroSection() {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#001233]">
       {/* Wave Ripple Effect */}
-      <div className="absolute inset-0 z-10">
+      <div className="absolute inset-0 z-10 pointer-events-none">
         <WaveRippleCanvas
           mousePosition={mousePosition}
           texts={textPositions}
@@ -91,7 +103,7 @@ export function HeroSection() {
       <div className="relative container mx-auto px-4 text-center z-30">
         <div className="max-w-4xl mx-auto">
           {/* Animated Circular Text - Positioned to encompass all content */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
             <CircularText
               text="MAELSTROM*MAELSTROM*"
               onHover="speedUp"
@@ -107,18 +119,18 @@ export function HeroSection() {
           </div>
 
           {/* Spacer for canvas text */}
-          <div className="h-[300px]"></div>
+          <div className="h-[200px] sm:h-[250px] md:h-[300px]"></div>
 
           {/* CTA Buttons - Positioned below canvas text */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-32">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-24 sm:mt-32 md:mt-44">
             <Button
               asChild
-              size="lg"
-              className="bg-accent hover:bg-accent-cyan-2 text-accent-foreground glow-primary"
+              size="default"
+              className="bg-accent hover:bg-accent-cyan-2 text-accent-foreground glow-primary mt-8 w-auto px-8"
             >
               <Link href="/swap">
                 Swap
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </div>

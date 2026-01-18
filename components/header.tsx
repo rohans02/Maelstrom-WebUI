@@ -5,16 +5,19 @@ import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { useState } from "react";
+import { Menu, X, Home, Repeat2, Droplets, LayoutDashboard, Plus } from "lucide-react";
 
 const navigation = [
-  { name: "Swap", href: "/swap" },
-  { name: "Pools", href: "/pools" },
-  { name: "Dashboard", href: "/dashboard" },
-  { name: "Create Pool", href: "/create" },
+  { name: "Swap", href: "/swap", icon: Repeat2 },
+  { name: "Pools", href: "/pools", icon: Droplets },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Create Pool", href: "/create", icon: Plus },
 ];
 
 export function Header() {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <>
@@ -63,9 +66,64 @@ export function Header() {
 
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
-            <ConnectButton accountStatus={"address"} showBalance={false} />
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg hover:bg-accent/10 transition-colors"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+
+            <div className="hidden md:block">
+              <ConnectButton accountStatus={"address"} showBalance={false} />
+            </div>
           </div>
         </div>
+
+         {mobileMenuOpen && (
+          <div className="md:hidden border-t border-border/40 bg-background/95 backdrop-blur">
+            <nav className="container mx-auto px-4 py-4 space-y-1">
+              <Link
+                href="/"
+                onClick={() => setMobileMenuOpen(false)}
+                className={cn(
+                  "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors",
+                  pathname === "/"
+                    ? "bg-accent/10 text-accent"
+                    : "text-foreground hover:bg-accent/5"
+                )}
+              >
+                <Home className="h-5 w-5" />
+                <span className="text-base font-medium">Home</span>
+              </Link>
+              
+              {navigation.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors",
+                    pathname === item.href
+                      ? "bg-accent/10 text-accent"
+                      : "text-foreground hover:bg-accent/5"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span className="text-base font-medium">{item.name}</span>
+                </Link>
+              ))}
+
+              <div className="pt-4 border-t border-border/40">
+                <ConnectButton accountStatus={"address"} showBalance={false} />
+              </div>
+            </nav>
+          </div>
+        )}
       </header>
     </>
   );

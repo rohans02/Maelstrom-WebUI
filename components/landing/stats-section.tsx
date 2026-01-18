@@ -35,28 +35,28 @@ export function StatsSection() {
   }, [])
 
   return (
-    <section className="py-16 bg-muted/10">
+    <section className="py-12 sm:py-16 md:py-20 bg-muted/10">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">
+        <div className="text-center mb-8 sm:mb-12">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 sm:mb-4">
             Powering the Future of <span className="text-accent">DeFi</span>
           </h2>
-          <p className="text-muted-foreground">Real-time metrics from our growing ecosystem</p>
+          <p className="text-sm sm:text-base text-muted-foreground">Real-time metrics from our growing ecosystem</p>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {stats.map((stat, index) => (
             <Card key={index} className="group text-center border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden cursor-pointer">
               <RippleEffect color="rgba(124, 58, 237, 0.06)" />
-              <CardContent className="p-6 relative">
-                <div className="text-2xl md:text-3xl font-bold text-accent mb-2">
+              <CardContent className="p-3 sm:p-4 md:p-6 relative">
+                <div className="text-xl sm:text-2xl md:text-3xl font-bold text-accent mb-1 sm:mb-2">
                   {stat.value}
-                  {stat.suffix && <span className="text-lg">{stat.suffix}</span>}
+                  {stat.suffix && <span className="text-sm sm:text-base md:text-lg">{stat.suffix}</span>}
                 </div>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-                <div className="mt-2 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse mr-2" />
-                  <span className="text-xs text-green-500">Live</span>
+                <p className="text-xs sm:text-sm text-muted-foreground">{stat.label}</p>
+                <div className="mt-1 sm:mt-2 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-green-500 animate-pulse mr-1 sm:mr-2" />
+                  <span className="text-[10px] sm:text-xs text-green-500">Live</span>
                 </div>
               </CardContent>
             </Card>

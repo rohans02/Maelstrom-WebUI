@@ -29,29 +29,29 @@ const valueProps = [
 
 export function ValuePropsSection() {
   return (
-    <section className="py-24 bg-linear-to-b from-background to-muted/20">
+    <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-linear-to-b from-background to-muted/20">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-balance">
+        <div className="text-center mb-8 sm:mb-12 md:mb-16">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 text-balance">
             Why Choose <span className="text-accent">Maelstrom</span>
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto text-pretty">
+          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto text-pretty px-4">
             Built for the next generation of DeFi traders who demand speed, security, and seamless user experience.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
           {valueProps.map((prop) => (
             <Card
               key={prop.title}
               className="group hover:shadow-medium transition-all duration-300 hover:-translate-y-2 border-border/50 bg-card/50 backdrop-blur-sm relative overflow-hidden cursor-pointer"
             >
               <RippleEffect color="rgba(124, 58, 237, 0.06)" />
-              <CardContent className="p-6 text-center relative">
-          <div className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 group-hover:bg-accent/20 transition-colors duration-300">
-            <prop.icon className="h-6 w-6 text-accent" />
+              <CardContent className="p-4 sm:p-6 text-center relative">
+          <div className="mb-3 sm:mb-4 inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-accent/10 group-hover:bg-accent/20 transition-colors duration-300">
+            <prop.icon className="h-5 w-5 sm:h-6 sm:w-6 text-accent" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">{prop.title}</h3>
+          <h3 className="text-base sm:text-lg font-semibold mb-2">{prop.title}</h3>
           <p className="text-sm text-muted-foreground text-pretty">{prop.description}</p>
               </CardContent>
             </Card>
