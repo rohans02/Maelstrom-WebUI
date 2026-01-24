@@ -9,7 +9,7 @@ import { WaveRippleCanvas } from "../ui/wave-ripple-canvas";
 
 export function HeroSection() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const sectionRef = useRef(null);
+  const sectionRef = useRef<HTMLOptionElement | null>(null);
   const [textPositions, setTextPositions] = useState<
     Array<{
       text: string;
