@@ -32,10 +32,9 @@ export function Header() {
               <Image
                 src="/logo_maelstrom.svg"
                 alt="Maelstrom Logo"
-                className="dark:invert"
-                width={"50"}
-                height={"50"}
-                objectFit="contain"
+                className="dark:invert object-contain"
+                width={50}
+                height={50}
               />
             </div>
             <span className="text-xl font-bold gradient-text">Maelstrom</span>
