@@ -35,3 +35,26 @@
   font-weight: 900;
   letter-spacing: 0.05em;
 }
+
+/* Responsive circular text for mobile and tablet */
+@media (max-width: 1024px) {
+  .hero-circular-text {
+    width: 600px;
+    height: 600px;
+  }
+
+  .hero-circular-text span {
+    font-size: 42px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-circular-text {
+    width: 400px;
+    height: 400px;
+  }
+
+  .hero-circular-text span {
+    font-size: 28px !important;
+  }
+}

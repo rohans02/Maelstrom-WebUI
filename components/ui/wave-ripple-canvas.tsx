@@ -70,6 +70,11 @@ export function WaveRippleCanvas({
         powerPreference: 'high-performance'
       })
       renderer.setSize(window.innerWidth, window.innerHeight)
+      // Fix: prevent renderer from forcing canvas size that causes scroll
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      canvas.style.display = 'block';
+
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
       rendererRef.current = renderer
 
@@ -180,6 +185,9 @@ export function WaveRippleCanvas({
         const height = window.innerHeight
 
         renderer.setSize(width, height)
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        
         rtARef.current?.setSize(width, height)
         rtBRef.current?.setSize(width, height)
         simMaterial.uniforms.resolution.value.set(width, height)

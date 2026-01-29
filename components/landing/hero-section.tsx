@@ -95,7 +95,7 @@ export function HeroSection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#001233]">
+    <section ref={sectionRef} className="relative w-full min-h-screen flex items-center justify-center overflow-hidden bg-[#001233]">
       {/* Wave Ripple Effect */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         <WaveRippleCanvas
@@ -109,10 +109,10 @@ export function HeroSection() {
       <div className="absolute inset-0 bg-gradient-to-b from-[#001233] via-[#001845]/10 to-[#001233]/70 pointer-events-none z-20" />
 
       {/* Visible Content */}
-      <div className="relative container mx-auto px-4 text-center z-30">
-        <div className="max-w-4xl mx-auto">
+      <div className="relative w-full max-w-full px-4 text-center z-30">
+        <div className="max-w-4xl mx-auto w-full">
           {/* Animated Circular Text - Positioned to encompass all content */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none overflow-hidden flex items-center justify-center">
             <CircularText
               text="MAELSTROM*MAELSTROM*"
               onHover="speedUp"
